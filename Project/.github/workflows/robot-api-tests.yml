@@ -1,0 +1,70 @@
+name: Robot API Tests
+
+on:
+  workflow_dispatch:
+  pull_request:
+
+jobs:
+  robot-api-tests:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: srijansetu
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d srijansetu"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install backend dependencies
+        working-directory: Project/backend
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Install Robot dependencies
+        working-directory: Project
+        run: python -m pip install -r requirements-test.txt
+
+      - name: Run migrations
+        working-directory: Project/backend
+        env:
+          DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/srijansetu
+        run: python -m alembic upgrade head
+
+      - name: Start API
+        working-directory: Project/backend
+        env:
+          DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/srijansetu
+          JWT_SECRET_KEY: ci-test-secret
+        run: |
+          python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 &
+          sleep 5
+
+      - name: Run Robot tests
+        working-directory: Project
+        env:
+          BASE_URL: http://127.0.0.1:8000
+        run: robot -d reports tests/robot
+
+      - name: Upload Robot reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: robot-api-reports
+          path: Project/reports
+
