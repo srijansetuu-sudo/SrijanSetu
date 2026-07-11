@@ -14,6 +14,14 @@ from app.users.models import User
 router = APIRouter(tags=["quotations"])
 
 
+def _quotation_payload(quotation):
+    item = QuotationRead.model_validate(quotation).model_dump(mode="json")
+    if quotation.order:
+        item["order_id"] = str(quotation.order.id)
+        item["order_status"] = quotation.order.status.value
+    return item
+
+
 @router.post("/quotations", response_model=APIResponse)
 async def create_quotation(payload: QuotationCreate, db: AsyncSession = Depends(get_db), user: User = Depends(require_creator)):
     quotation = await service.create_quotation(db, user, payload)
@@ -23,7 +31,7 @@ async def create_quotation(payload: QuotationCreate, db: AsyncSession = Depends(
 @router.get("/requirements/{requirement_id}/quotations", response_model=APIResponse)
 async def list_quotations(requirement_id: UUID, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_active_user)):
     quotations = await service.list_for_requirement(db, user, requirement_id)
-    items = [QuotationRead.model_validate(item).model_dump(mode="json") for item in quotations]
+    items = [_quotation_payload(item) for item in quotations]
     return APIResponse(data={"items": items})
 
 

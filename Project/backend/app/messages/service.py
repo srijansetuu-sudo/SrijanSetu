@@ -8,7 +8,8 @@ from app.core.exceptions import ForbiddenError, NotFoundError
 from app.messages.models import Message
 from app.messages.schemas import MessageCreate
 from app.notifications.service import queue_notification
-from app.orders.models import Order
+from app.core.exceptions import APIError
+from app.orders.models import Order, OrderStatus
 from app.users.models import User
 
 
@@ -18,6 +19,8 @@ async def _authorize_order(db: AsyncSession, user: User, order_id: UUID) -> Orde
         raise NotFoundError("Order not found")
     if user.role.value != "ADMIN" and user.id not in {order.customer_id, order.creator_id}:
         raise ForbiddenError("You cannot access messages for this order")
+    if order.status == OrderStatus.PENDING:
+        raise APIError("Workspace messages unlock after the customer pays the activation deposit")
     return order
 
 

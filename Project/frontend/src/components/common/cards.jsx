@@ -3,7 +3,7 @@ import { CalendarDays, IndianRupee, Sparkles, Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { dateLabel, money } from "@/lib/utils";
+import { WORKSPACE_ACTIVATION_DEPOSIT, dateLabel, money } from "@/lib/utils";
 
 export function CreatorCard({ creator }) {
   const id = creator.id ?? creator.creator_profile_id ?? creator.profile_id;
@@ -17,8 +17,8 @@ export function CreatorCard({ creator }) {
             <span className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <Sparkles className="h-5 w-5" />
             </span>
-            <h3 className="text-lg font-bold text-primary">{creator.brand_name ?? creator.full_name ?? "Creator"}</h3>
-            <p className="mt-1 text-sm text-muted-foreground">{creator.headline ?? "Custom creation specialist"}</p>
+            <h3 className="text-lg font-bold text-primary">{creator.brand_name ?? creator.full_name ?? "Artist"}</h3>
+            <p className="mt-1 text-sm text-muted-foreground">{creator.headline ?? "Painter, maker, or artisan sharing handmade work"}</p>
           </div>
           <Badge variant="accent">{creator.years_of_experience ?? 0}+ yrs</Badge>
         </div>
@@ -57,6 +57,7 @@ export function RequirementCard({ requirement, href }) {
 }
 
 export function QuotationCard({ quotation, onAccept, onReject, onDelete }) {
+  const statusLabel = quotation.status === "ACCEPTED" && quotation.order_status === "PENDING" ? "PAYMENT PENDING" : quotation.status;
   return (
     <Card>
       <CardContent>
@@ -65,12 +66,18 @@ export function QuotationCard({ quotation, onAccept, onReject, onDelete }) {
             <p className="font-bold text-primary">{money(quotation.proposed_price)}</p>
             <p className="mt-1 text-sm text-muted-foreground">{quotation.estimated_days} days</p>
           </div>
-          <Badge>{quotation.status}</Badge>
+          <Badge>{statusLabel}</Badge>
         </div>
         <p className="mt-4 text-sm text-muted-foreground">{quotation.message}</p>
+        {onAccept ? (
+          <div className="mt-4 rounded-lg border border-border bg-muted/60 p-3 text-sm">
+            <p className="font-semibold text-primary">Workspace starts with a {money(WORKSPACE_ACTIVATION_DEPOSIT)} advance deposit.</p>
+            <p className="mt-1 text-muted-foreground">This confirms the customer is serious and is adjusted against the final quoted amount.</p>
+          </div>
+        ) : null}
         {(onAccept || onReject || onDelete) ? (
           <div className="mt-5 flex gap-2">
-            {onAccept ? <Button size="sm" onClick={onAccept}>Accept</Button> : null}
+            {onAccept ? <Button size="sm" onClick={onAccept}>Accept and pay {money(WORKSPACE_ACTIVATION_DEPOSIT)}</Button> : null}
             {onReject ? <Button size="sm" variant="outline" onClick={onReject}>Reject</Button> : null}
             {onDelete ? <Button size="sm" variant="outline" onClick={onDelete}>Delete</Button> : null}
           </div>

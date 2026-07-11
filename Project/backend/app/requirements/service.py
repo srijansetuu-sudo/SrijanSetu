@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import ForbiddenError, NotFoundError
 from app.notifications.service import queue_for_creators
-from app.requirements.models import Requirement, RequirementReference
+from app.requirements.models import Requirement, RequirementReference, RequirementStatus
 from app.requirements.schemas import RequirementCreate, RequirementReferenceCreate, RequirementUpdate
 from app.users.models import User
 
@@ -29,7 +29,11 @@ async def create_requirement(db: AsyncSession, user: User, payload: RequirementC
 
 async def list_requirements(db: AsyncSession, limit: int, offset: int) -> list[Requirement]:
     result = await db.scalars(
-        select(Requirement).order_by(Requirement.created_at.desc()).offset(offset).limit(limit)
+        select(Requirement)
+        .where(Requirement.status == RequirementStatus.OPEN)
+        .order_by(Requirement.created_at.desc())
+        .offset(offset)
+        .limit(limit)
     )
     return list(result)
 

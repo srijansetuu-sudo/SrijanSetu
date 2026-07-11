@@ -160,19 +160,18 @@ export function ProfilePage() {
                 saveProfile.mutate(values);
               }, showFormValidationToast)}>
                 <Field label="Your name" required error={form.formState.errors.full_name}><Input {...form.register("full_name")} /></Field>
-                <Field label="Profile photo URL" error={form.formState.errors.avatar_url}><Input {...form.register("avatar_url")} /></Field>
 
                 {isCreator ? (
                   <>
                     <div className="grid gap-4 md:grid-cols-2">
-                      <Field label="Brand name" required error={form.formState.errors.brand_name}><Input {...form.register("brand_name")} /></Field>
-                      <Field label="Headline" error={form.formState.errors.headline}><Input placeholder="Wedding filmmaker, logo designer..." {...form.register("headline")} /></Field>
+                      <Field label="Studio or artist name" required error={form.formState.errors.brand_name}><Input {...form.register("brand_name")} /></Field>
+                      <Field label="Headline" error={form.formState.errors.headline}><Input placeholder="Painter, ceramic artist, decor maker..." {...form.register("headline")} /></Field>
                     </div>
                     <Field label="Description" error={form.formState.errors.description}><Textarea {...form.register("description")} /></Field>
                     <div className="grid gap-4 md:grid-cols-3">
                       <Field label="Years of experience" error={form.formState.errors.years_of_experience}><Input type="number" {...form.register("years_of_experience")} /></Field>
                       <Field label="Response time hours" error={form.formState.errors.response_time_hours}><Input type="number" {...form.register("response_time_hours")} /></Field>
-                      <Field label="Categories" error={form.formState.errors.categories}><Input placeholder="Logo, Video, UI" {...form.register("categories")} /></Field>
+                      <Field label="Categories" error={form.formState.errors.categories}><Input placeholder="Paintings, pottery, home decor" {...form.register("categories")} /></Field>
                     </div>
                     <Field label="Portfolio cover URL" error={form.formState.errors.portfolio_cover_url}><Input {...form.register("portfolio_cover_url")} /></Field>
                     <div className="grid gap-4 md:grid-cols-3">

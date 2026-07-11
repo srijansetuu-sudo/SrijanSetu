@@ -78,8 +78,7 @@ function AuthFrame({ mode, title, subtitle, children, footer }) {
             <div className="p-5 sm:p-7">
               <div className="mb-6 flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-sm font-bold uppercase tracking-wide text-[#1d4ed8]">{isSignup ? "Create your account" : "Sign in"}</p>
-                  <h1 className="mt-2 text-3xl font-bold text-primary">{title}</h1>
+                  <h1 className="text-3xl font-bold text-primary">{title}</h1>
                   <p className="mt-2 text-sm leading-6 text-muted-foreground">{subtitle}</p>
                 </div>
                 <div className="grid h-12 w-12 shrink-0 place-items-center rounded-lg bg-[#fff2a3] text-primary shadow-inner">

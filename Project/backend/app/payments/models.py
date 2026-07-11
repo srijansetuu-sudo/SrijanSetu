@@ -20,6 +20,7 @@ class Payment(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "payments"
 
     order_id: Mapped[UUID] = mapped_column(PgUUID(as_uuid=True), ForeignKey("orders.id"), index=True, nullable=False)
+    razorpay_order_id: Mapped[str | None] = mapped_column(Text, nullable=True, index=True)
     razorpay_payment_id: Mapped[str | None] = mapped_column(Text, nullable=True, index=True)
     amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
     payment_status: Mapped[PaymentStatus] = mapped_column(SqlEnum(PaymentStatus), default=PaymentStatus.PENDING, index=True, nullable=False)

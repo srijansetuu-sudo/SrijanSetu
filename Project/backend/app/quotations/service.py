@@ -3,10 +3,11 @@ from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.exceptions import APIError, ForbiddenError, NotFoundError
 from app.notifications.service import queue_notification
-from app.orders.models import Order
+from app.orders.models import Order, OrderStatus
 from app.quotations.models import Quotation, QuotationStatus
 from app.quotations.schemas import QuotationCreate
 from app.requirements.models import Requirement, RequirementStatus
@@ -50,7 +51,11 @@ async def list_for_requirement(db: AsyncSession, user: User, requirement_id: UUI
         raise NotFoundError("Requirement not found")
     if requirement.customer_id != user.id and user.role.value != "ADMIN":
         raise ForbiddenError("Only the requirement owner can view quotations")
-    result = await db.scalars(select(Quotation).where(Quotation.requirement_id == requirement_id))
+    result = await db.scalars(
+        select(Quotation)
+        .options(selectinload(Quotation.order))
+        .where(Quotation.requirement_id == requirement_id)
+    )
     return list(result)
 
 
@@ -68,11 +73,13 @@ async def accept_quotation(db: AsyncSession, user: User, quotation_id: UUID) -> 
         raise NotFoundError("Requirement not found")
     if requirement.customer_id != user.id:
         raise ForbiddenError("Only the requirement owner can accept quotations")
+    existing_order = await db.scalar(select(Order).where(Order.requirement_id == requirement.id))
+    if quotation.status == QuotationStatus.ACCEPTED and existing_order and existing_order.status == OrderStatus.PENDING:
+        return existing_order
     if requirement.status != RequirementStatus.OPEN:
         raise APIError("Only open requirements can accept quotations")
     if quotation.status != QuotationStatus.PENDING:
         raise APIError("Only pending quotations can be accepted")
-    existing_order = await db.scalar(select(Order).where(Order.requirement_id == requirement.id))
     if existing_order:
         raise APIError("This requirement already has an order")
 

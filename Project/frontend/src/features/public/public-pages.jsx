@@ -16,7 +16,31 @@ import { queryKeys } from "@/constants/query-keys";
 import { asArray } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth-store";
 
-const steps = ["Customer posts a requirement", "Creators submit quotations", "Customer accepts and pays", "Creator delivers files", "Customer reviews creator"];
+const steps = [
+  "Visitors discover artists, painters, and makers through real stories and work",
+  "Artists share their craft, style, and availability",
+  "Customers reserve a piece or start a custom request",
+  "Artists create, refine, and deliver the final piece",
+  "Customers pay securely and leave a review",
+];
+const faqs = [
+  {
+    question: "How do I choose an artist?",
+    answer: "Browse their style, story, materials, and past work to find a piece that feels personal and authentic.",
+  },
+  {
+    question: "Why is there an advance deposit?",
+    answer: "The deposit helps secure a custom commission or handmade order and is adjusted against the final amount.",
+  },
+  {
+    question: "Can artists send proposals?",
+    answer: "Yes. Artists can share their approach, timeline, and a short note for each request.",
+  },
+  {
+    question: "Where do project details stay?",
+    answer: "Accepted work moves into a workspace where messages, reference images, and delivery updates remain together.",
+  },
+];
 
 export function LandingPage() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -31,14 +55,14 @@ export function LandingPage() {
           <div className="container-page relative grid items-center gap-10 md:grid-cols-[1.1fr_0.9fr]">
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
               <p className="text-sm font-bold uppercase tracking-wide text-[#1d4ed8]">From Thought To Creation</p>
-              <h1 className="mt-4 max-w-3xl text-4xl font-bold leading-tight text-primary md:text-6xl">Post your idea. Find the right creator.</h1>
-              <p className="mt-5 max-w-2xl text-lg text-muted-foreground">SrijanSetu helps customers share work requirements, get quotes from creators, pay safely, track delivery, and give reviews.</p>
+              <h1 className="mt-4 max-w-3xl text-4xl font-bold leading-tight text-primary md:text-6xl">Discover handmade art, pottery, planters, and decor made by real creators.</h1>
+              <p className="mt-5 max-w-2xl text-lg text-muted-foreground">SrijanSetu helps people discover authentic paintings, handcrafted pottery, aluminium planters, and other artisan-made pieces while giving creators a place to share their work and connect with buyers.</p>
               <div className="mt-8 flex flex-wrap gap-3">
-                <Button asChild variant="primary"><Link href={isAuthenticated ? "/creators" : "/login"}>Find Creators <ArrowRight className="h-4 w-4" /></Link></Button>
+                <Button asChild variant="primary"><Link href={isAuthenticated ? "/creators" : "/login"}>Explore Creators <ArrowRight className="h-4 w-4" /></Link></Button>
                 {role === "CREATOR" ? (
-                  <Button asChild variant="accent"><Link href="/dashboard/creator/requirements">Browse Requirements</Link></Button>
+                  <Button asChild variant="accent"><Link href="/dashboard/creator/requirements">View Requests</Link></Button>
                 ) : (
-                  <Button asChild variant="accent"><Link href="/dashboard/customer/requirements/new">Post Requirement</Link></Button>
+                  <Button asChild variant="accent"><Link href="/dashboard/customer/requirements/new">Post a Request</Link></Button>
                 )}
               </div>
             </motion.div>
@@ -80,8 +104,8 @@ export function LandingPage() {
         <section className="container-page py-8">
           <h2 className="text-3xl font-bold text-primary">FAQ</h2>
           <div className="mt-6 grid gap-4 md:grid-cols-2">
-            {["How do I choose a creator?", "Can creators send quotations?", "Where do order files live?", "How are reviews submitted?"].map((q) => (
-              <Card key={q}><CardContent><p className="font-semibold text-primary">{q}</p><p className="mt-2 text-sm text-muted-foreground">Use the connected dashboard workflows to manage each step through the backend API.</p></CardContent></Card>
+            {faqs.map((item) => (
+              <Card key={item.question}><CardContent><p className="font-semibold text-primary">{item.question}</p><p className="mt-2 text-sm text-muted-foreground">{item.answer}</p></CardContent></Card>
             ))}
           </div>
         </section>

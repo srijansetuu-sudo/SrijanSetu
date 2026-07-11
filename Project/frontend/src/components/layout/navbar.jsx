@@ -38,7 +38,7 @@ export function Navbar() {
           <Image src="/srijansetu-logo.png" alt="SrijanSetu" width={42} height={42} className="rounded-md" />
           <div className="leading-tight">
             <p className="font-bold text-primary">SrijanSetu</p>
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">From Thought To Creation</p>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Discover Handmade Art</p>
           </div>
         </Link>
         <nav className="hidden items-center gap-6 md:flex">

@@ -16,12 +16,19 @@ class PaymentCreate(BlankStringAsNoneModel):
 
 class PaymentVerify(BlankStringAsNoneModel):
     razorpay_payment_id: str = Field(min_length=1)
+    razorpay_order_id: str | None = Field(default=None, min_length=1)
+    razorpay_signature: str | None = Field(default=None, min_length=1)
     status: PaymentStatus = PaymentStatus.SUCCESS
+
+
+class PaymentVerifyRequest(PaymentVerify):
+    payment_id: UUID
 
 
 class PaymentRead(BaseModel):
     id: UUID
     order_id: UUID
+    razorpay_order_id: str | None
     razorpay_payment_id: str | None
     amount: Decimal
     payment_status: PaymentStatus

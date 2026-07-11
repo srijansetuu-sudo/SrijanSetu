@@ -120,6 +120,7 @@ CREATE TABLE messages (
 CREATE TABLE payments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   order_id UUID NOT NULL REFERENCES orders(id),
+  razorpay_order_id TEXT,
   razorpay_payment_id TEXT,
   amount DECIMAL(12, 2) NOT NULL,
   payment_status paymentstatus NOT NULL DEFAULT 'PENDING',

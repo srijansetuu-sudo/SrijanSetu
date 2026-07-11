@@ -14,7 +14,7 @@ depends_on = None
 
 
 def upgrade():
-    op.add_column("messages", sa.Column("attachment_name", sa.String(length=255), nullable=True))
+    op.execute("ALTER TABLE messages ADD COLUMN IF NOT EXISTS attachment_name VARCHAR(255)")
 
 
 def downgrade():

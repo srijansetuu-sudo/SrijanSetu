@@ -63,6 +63,15 @@ export const messageService = {
   websocketUrl: (orderId, token) => websocketUrl(`/messages/orders/${orderId}/ws`, { token }),
 };
 
+export const uploadService = {
+  uploadFile: (file, folder = "uploads") => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("folder", folder);
+    return pick(api.post("/uploads/file", formData), "url");
+  },
+};
+
 export const paymentService = {
   create: (payload) => pick(api.post("/payments", body(payload)), "payment"),
   verify: (id, payload) => pick(api.patch(`/payments/${id}/verify`, body(payload)), "payment"),

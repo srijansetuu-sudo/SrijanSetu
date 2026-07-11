@@ -15,6 +15,15 @@ class Settings(BaseSettings):
     razorpay_webhook_secret: str = ""
     commission_percent: int = 15
     frontend_origin: str = "http://localhost:3000"
+    upload_provider: str | None = None
+    cloudinary_cloud_name: str | None = None
+    cloudinary_api_key: str | None = None
+    cloudinary_api_secret: str | None = None
+    s3_bucket_name: str | None = None
+    s3_region_name: str | None = None
+    s3_endpoint_url: str | None = None
+    s3_access_key_id: str | None = None
+    s3_secret_access_key: str | None = None
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

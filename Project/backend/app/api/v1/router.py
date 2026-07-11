@@ -9,6 +9,7 @@ from app.payments.routes import router as payments_router
 from app.quotations.routes import router as quotations_router
 from app.requirements.routes import router as requirements_router
 from app.reviews.routes import router as reviews_router
+from app.uploads.routes import router as uploads_router
 from app.users.routes import router as users_router
 
 api_router = APIRouter()
@@ -21,4 +22,5 @@ api_router.include_router(orders_router)
 api_router.include_router(messages_router)
 api_router.include_router(payments_router)
 api_router.include_router(reviews_router)
+api_router.include_router(uploads_router)
 api_router.include_router(notifications_router)

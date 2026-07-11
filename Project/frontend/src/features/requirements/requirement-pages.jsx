@@ -21,8 +21,37 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { showFormValidationToast, useApiMutation, useApiQuery } from "@/hooks/use-api";
 import { queryKeys } from "@/constants/query-keys";
-import { quotationService, requirementService } from "@/services/api-services";
-import { asArray, dateLabel, money } from "@/lib/utils";
+import { paymentService, quotationService, requirementService, uploadService } from "@/services/api-services";
+import { WORKSPACE_ACTIVATION_DEPOSIT, asArray, dateLabel, money } from "@/lib/utils";
+import { useAuthStore } from "@/store/auth-store";
+
+const RAZORPAY_CHECKOUT_SRC = "https://checkout.razorpay.com/v1/checkout.js";
+const RAZORPAY_UPI_DISPLAY_CONFIG = {
+  display: {
+    blocks: {
+      upi: {
+        name: "Pay using UPI",
+        instruments: [{ method: "upi" }],
+      },
+    },
+    sequence: ["block.upi"],
+    preferences: {
+      show_default_blocks: true,
+    },
+  },
+};
+
+function loadRazorpayCheckout() {
+  if (typeof window === "undefined") return Promise.resolve(false);
+  if (window.Razorpay) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    const script = document.createElement("script");
+    script.src = RAZORPAY_CHECKOUT_SRC;
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+}
 
 function todayDateInputValue() {
   const today = new Date();
@@ -51,8 +80,17 @@ const quotationSchema = z.object({
   message: z.string().min(10, "Message must be at least 10 characters"),
 });
 
-function FormField({ label, children }) {
-  return <label className="grid gap-2 text-sm font-semibold text-primary">{label}{children}</label>;
+function FormField({ label, children, required = false, description }) {
+  return (
+    <label className="grid gap-2 text-sm font-semibold text-primary">
+      <span>
+        {label}
+        {required ? <span className="ml-1 text-accent">*</span> : null}
+      </span>
+      {description ? <span className="text-xs font-normal text-muted-foreground">{description}</span> : null}
+      {children}
+    </label>
+  );
 }
 
 function RequirementStat({ icon: Icon, label, value }) {
@@ -108,6 +146,7 @@ export function RequirementDetailsPage() {
   const selectedDays = watch("estimated_days");
   const message = watch("message") ?? "";
   const setQuoteValue = (name, value) => setValue(name, value, { shouldDirty: true, shouldValidate: true });
+  const canQuote = item.status === "OPEN";
 
   return (
     <ProtectedRoute roles={["CREATOR"]}>
@@ -163,6 +202,11 @@ export function RequirementDetailsPage() {
                   {myQuotations.isLoading ? <LoadingState /> : existingQuotation ? (
                     <div className="mt-6">
                       <QuotationCard quotation={existingQuotation} onDelete={existingQuotation.status === "ACCEPTED" ? undefined : () => deleteQuote.mutate(existingQuotation.id)} />
+                    </div>
+                  ) : !canQuote ? (
+                    <div className="mt-6 rounded-lg border border-border bg-muted/60 p-4">
+                      <p className="font-semibold text-primary">This requirement is already in progress.</p>
+                      <p className="mt-1 text-sm text-muted-foreground">Creators can send quotations only while a requirement is open.</p>
                     </div>
                   ) : (
                   <form className="mt-6 grid gap-5" onSubmit={handleSubmit((values) => quote.mutate(values, { onSuccess: () => reset() }), showFormValidationToast)}>
@@ -233,8 +277,102 @@ export function RequirementFormPage() {
   const router = useRouter();
   const create = useApiMutation(requirementService.create, { successMessage: "Requirement created", invalidate: queryKeys.myRequirements, onSuccess: () => router.push("/dashboard/customer/requirements") });
   const { register, handleSubmit, formState: { errors } } = useForm({ resolver: zodResolver(requirementSchema) });
+  const [referencePhoto, setReferencePhoto] = useState("");
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const minDeadline = todayDateInputValue();
-  return <ProtectedRoute roles={["CUSTOMER"]}><DashboardShell><Card><CardContent><h1 className="text-3xl font-bold text-primary">Create Requirement</h1><form className="mt-6 grid gap-4" onSubmit={handleSubmit((values) => create.mutate(values), showFormValidationToast)}><FormField label="Title" error={errors.title}><Input {...register("title")} /></FormField><FormField label="Description" error={errors.description}><Textarea {...register("description")} /></FormField><div className="grid gap-4 md:grid-cols-2"><FormField label="Budget min" error={errors.budget_min}><Input type="number" {...register("budget_min")} /></FormField><FormField label="Budget max" error={errors.budget_max}><Input type="number" {...register("budget_max")} /></FormField></div><FormField label="Deadline" error={errors.deadline}><Input type="date" min={minDeadline} {...register("deadline")} /></FormField><FormField label="AI generated reference" error={errors.ai_generated_reference}><Input {...register("ai_generated_reference")} /></FormField><Button disabled={create.isPending}>Create requirement</Button></form></CardContent></Card></DashboardShell></ProtectedRoute>;
+
+  const handleReferencePhoto = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5_000_000) {
+      showFormValidationToast({ ai_generated_reference: { message: "Photo must be under 5 MB" } });
+      event.target.value = "";
+      return;
+    }
+    setIsUploadingPhoto(true);
+    try {
+      const uploadedUrl = await uploadService.uploadFile(file, "requirements");
+      setReferencePhoto(uploadedUrl || "");
+    } catch {
+      showFormValidationToast({ ai_generated_reference: { message: "Photo upload failed" } });
+    } finally {
+      setIsUploadingPhoto(false);
+      event.target.value = "";
+    }
+  };
+
+  const submitRequirement = (values) => {
+    const detailLines = [
+      values.category?.trim() ? `Item type: ${values.category.trim()}` : null,
+      values.material?.trim() ? `Material preference: ${values.material.trim()}` : null,
+      values.size?.trim() ? `Size / dimensions: ${values.size.trim()}` : null,
+      values.style?.trim() ? `Preferred style: ${values.style.trim()}` : null,
+      values.notes?.trim() ? `Extra notes: ${values.notes.trim()}` : null,
+    ].filter(Boolean);
+
+    const payload = {
+      ...values,
+      description: [values.description?.trim(), ...detailLines].filter(Boolean).join("\n\n"),
+      ai_generated_reference: referencePhoto || values.ai_generated_reference || undefined,
+    };
+
+    create.mutate(payload);
+  };
+
+  return (
+    <ProtectedRoute roles={["CUSTOMER"]}>
+      <DashboardShell>
+        <Card>
+          <CardContent>
+            <h1 className="text-3xl font-bold text-primary">Create Requirement</h1>
+            <form className="mt-6 grid gap-4" onSubmit={handleSubmit(submitRequirement, showFormValidationToast)}>
+              <FormField label="Title" required error={errors.title}>
+                <Input {...register("title")} />
+              </FormField>
+              <FormField label="Description" required description="Describe what you need, including the kind of handmade item you want." error={errors.description}>
+                <Textarea {...register("description")} />
+              </FormField>
+              <div className="grid gap-4 md:grid-cols-2">
+                <FormField label="Budget min" required error={errors.budget_min}>
+                  <Input type="number" {...register("budget_min")} />
+                </FormField>
+                <FormField label="Budget max" required error={errors.budget_max}>
+                  <Input type="number" {...register("budget_max")} />
+                </FormField>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <FormField label="Item type" description="Painting, pottery, planter, basket, decor, etc." error={errors.category}>
+                  <Input placeholder="Handmade pottery, planter, painting..." {...register("category")} />
+                </FormField>
+                <FormField label="Material preference" description="Ceramic, clay, brass, wood, fabric, etc." error={errors.material}>
+                  <Input placeholder="Clay, aluminium, wood..." {...register("material")} />
+                </FormField>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <FormField label="Size / dimensions" error={errors.size}>
+                  <Input placeholder="Small, 12x18 inches, 20 cm..." {...register("size")} />
+                </FormField>
+                <FormField label="Preferred style" error={errors.style}>
+                  <Input placeholder="Minimal, rustic, modern, traditional..." {...register("style")} />
+                </FormField>
+              </div>
+              <FormField label="Reference photo" description="Upload a real photo or an AI-generated reference image for the handmade item." error={errors.ai_generated_reference}>
+                <input type="file" accept="image/*" onChange={handleReferencePhoto} disabled={isUploadingPhoto} className="rounded-lg border border-border bg-muted px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60" />
+                {isUploadingPhoto ? <p className="text-xs font-normal text-muted-foreground">Uploading photo...</p> : referencePhoto ? <p className="text-xs font-normal text-muted-foreground">Photo attached and ready to submit.</p> : null}
+              </FormField>
+              <FormField label="Extra notes" description="Optional details such as colors, use case, or delivery preference." error={errors.notes}>
+                <Textarea {...register("notes")} />
+              </FormField>
+              <FormField label="Deadline" error={errors.deadline}>
+                <Input type="date" min={minDeadline} {...register("deadline")} />
+              </FormField>
+              <Button disabled={create.isPending}>Create requirement</Button>
+            </form>
+          </CardContent>
+        </Card>
+      </DashboardShell>
+    </ProtectedRoute>
+  );
 }
 
 export function CustomerRequirementDetailsPage() {
@@ -244,20 +382,105 @@ export function CustomerRequirementDetailsPage() {
   const remove = useApiMutation(() => requirementService.remove(id), { successMessage: "Requirement deleted", invalidate: queryKeys.myRequirements, onSuccess: () => router.push("/dashboard/customer/requirements") });
   const addRef = useApiMutation((payload) => requirementService.references(id, payload), { successMessage: "Reference added", invalidate: queryKeys.requirement(id) });
   const item = query.data ?? {};
-  return <ProtectedRoute roles={["CUSTOMER"]}><DashboardShell><div className="grid gap-6">{query.isLoading ? <LoadingState /> : <Card><CardContent><h1 className="text-3xl font-bold text-primary">{item.title}</h1><p className="mt-3 text-muted-foreground">{item.description}</p><div className="mt-6 flex flex-wrap gap-3"><Button asChild variant="outline"><Link href={`/dashboard/customer/requirements/${id}/quotations`}>View quotations</Link></Button><Button variant="outline" onClick={() => remove.mutate()}>Delete</Button></div><form className="mt-6 flex gap-3" onSubmit={(event) => { event.preventDefault(); const image_url = new FormData(event.currentTarget).get("image_url"); addRef.mutate({ image_url }); event.currentTarget.reset(); }}><Input name="image_url" placeholder="Reference image URL" /><Button>Add Reference</Button></form></CardContent></Card>}</div></DashboardShell></ProtectedRoute>;
+  return <ProtectedRoute roles={["CUSTOMER"]}><DashboardShell><div className="grid gap-6">{query.isLoading ? <LoadingState /> : <Card><CardContent><h1 className="text-3xl font-bold text-primary">{item.title}</h1><p className="mt-3 text-muted-foreground">{item.description}</p><div className="mt-6 flex flex-wrap gap-3"><Button asChild variant="outline"><Link href={`/dashboard/customer/requirements/${id}/quotations`}>View quotations</Link></Button><Button variant="outline" onClick={() => remove.mutate()}>Delete</Button></div></CardContent></Card>}</div></DashboardShell></ProtectedRoute>;
 }
 
 export function RequirementQuotationsPage() {
   const { id } = useParams();
   const router = useRouter();
+  const user = useAuthStore((state) => state.user);
   const query = useApiQuery(queryKeys.quotations(id), () => requirementService.quotations(id), { enabled: Boolean(id) });
   const accept = useApiMutation(quotationService.accept, {
     successMessage: "Quotation accepted",
     invalidate: queryKeys.quotations(id),
-    onSuccess: (order) => router.push(`/orders/${order.id}`),
   });
+  const createPayment = useApiMutation(paymentService.create, { successMessage: "Payment started" });
+  const verifyPayment = useApiMutation(({ paymentId, payload }) => paymentService.verify(paymentId, payload), { successMessage: "Payment successful", invalidate: [queryKeys.quotations(id), queryKeys.payments] });
   const reject = useApiMutation(quotationService.reject, { successMessage: "Quotation rejected", invalidate: queryKeys.quotations(id) });
   const quotations = asArray(query.data);
-  const hasAcceptedQuotation = quotations.some((quotation) => quotation.status === "ACCEPTED");
-  return <ProtectedRoute roles={["CUSTOMER"]}><DashboardShell><h1 className="text-3xl font-bold text-primary">Quotations Received</h1><div className="mt-6 grid gap-4">{query.isLoading ? <LoadingState /> : quotations.length ? quotations.map((quotation) => <QuotationCard key={quotation.id} quotation={quotation} onAccept={!hasAcceptedQuotation && quotation.status === "PENDING" ? () => accept.mutate(quotation.id) : undefined} onReject={!hasAcceptedQuotation && quotation.status === "PENDING" ? () => reject.mutate(quotation.id) : undefined} />) : <EmptyState title="No quotations yet" />}</div></DashboardShell></ProtectedRoute>;
+  const hasActiveAcceptedQuotation = quotations.some((quotation) => quotation.status === "ACCEPTED" && quotation.order_status !== "PENDING");
+
+  const openDepositCheckout = async (order, quotation) => {
+    const isLocalBypass = process.env.NODE_ENV !== "production";
+    const razorpayKey = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
+    if (!razorpayKey && !isLocalBypass) {
+      showFormValidationToast({ payment: { message: "Razorpay public key is not configured" } });
+      return;
+    }
+    if (isLocalBypass) {
+      createPayment.mutate({ order_id: order.id, amount: Math.min(Number(order.total_amount ?? quotation.proposed_price ?? 0), WORKSPACE_ACTIVATION_DEPOSIT), payment_method: "workspace_activation" }, {
+        onSuccess: (payment) => {
+          verifyPayment.mutate({
+            paymentId: payment.id,
+            payload: {
+              razorpay_payment_id: `local_test_${payment.id}`,
+              razorpay_order_id: payment.razorpay_order_id,
+              status: "SUCCESS",
+            },
+          }, { onSuccess: () => router.push(`/orders/${order.id}`) });
+        },
+      });
+      return;
+    }
+    const loaded = await loadRazorpayCheckout();
+    if (!loaded) {
+      showFormValidationToast({ payment: { message: "Razorpay checkout could not be loaded" } });
+      return;
+    }
+    const amount = Math.min(Number(order.total_amount ?? quotation.proposed_price ?? 0), WORKSPACE_ACTIVATION_DEPOSIT);
+    createPayment.mutate({ order_id: order.id, amount, payment_method: "workspace_activation" }, {
+      onSuccess: (payment) => {
+        const checkout = new window.Razorpay({
+          key: razorpayKey,
+          amount: Math.round(Number(payment.amount) * 100),
+          currency: "INR",
+          name: "SrijanSetu",
+          description: "Advance workspace deposit",
+          order_id: payment.razorpay_order_id,
+          method: {
+            upi: true,
+          },
+          config: RAZORPAY_UPI_DISPLAY_CONFIG,
+          prefill: {
+            name: user?.full_name || "",
+            email: user?.email || "",
+          },
+          theme: { color: "#1f2c77" },
+          modal: {
+            ondismiss: () => {
+              showFormValidationToast({ payment: { message: "Payment was cancelled" } });
+            },
+          },
+          handler: (response) => {
+            verifyPayment.mutate({
+              paymentId: payment.id,
+              payload: {
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_signature: response.razorpay_signature,
+                status: "SUCCESS",
+              },
+            }, { onSuccess: () => router.push(`/orders/${order.id}`) });
+          },
+        });
+        checkout.on("payment.failed", (response) => {
+          showFormValidationToast({ payment: { message: response.error?.description || "Payment failed" } });
+        });
+        checkout.open();
+      },
+    });
+  };
+
+  const acceptAndPay = (quotation) => {
+    if (quotation.order_id && quotation.order_status === "PENDING") {
+      openDepositCheckout({ id: quotation.order_id, total_amount: quotation.proposed_price }, quotation);
+      return;
+    }
+    accept.mutate(quotation.id, { onSuccess: (order) => openDepositCheckout(order, quotation) });
+  };
+
+  return <ProtectedRoute roles={["CUSTOMER"]}><DashboardShell><h1 className="text-3xl font-bold text-primary">Quotations Received</h1><div className="mt-6 grid gap-4">{query.isLoading ? <LoadingState /> : quotations.length ? quotations.map((quotation) => {
+    const canPayDeposit = !hasActiveAcceptedQuotation && (quotation.status === "PENDING" || (quotation.status === "ACCEPTED" && quotation.order_status === "PENDING"));
+    return <QuotationCard key={quotation.id} quotation={quotation} onAccept={canPayDeposit ? () => acceptAndPay(quotation) : undefined} onReject={!hasActiveAcceptedQuotation && quotation.status === "PENDING" ? () => reject.mutate(quotation.id) : undefined} />;
+  }) : <EmptyState title="No quotations yet" />}</div></DashboardShell></ProtectedRoute>;
 }
