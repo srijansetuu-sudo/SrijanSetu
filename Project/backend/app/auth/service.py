@@ -12,6 +12,9 @@ from app.core.config import settings
 from app.users.models import RefreshToken, User
 from app.users.models import UserRole
 
+DEFAULT_ADMIN_EMAIL = "admin@srijansetu.com"
+DEFAULT_ADMIN_PASSWORD = "Admin@2026Secure"
+
 
 def _token_expiry_datetime(days: int) -> datetime:
     return datetime.now(UTC) + timedelta(days=days)
@@ -29,6 +32,9 @@ def _store_refresh_token(db: AsyncSession, user_id: str, token_jti: str, refresh
 
 
 async def signup(db: AsyncSession, full_name: str, email: str, password: str, role: UserRole) -> tuple[str, str, User]:
+    if role == UserRole.ADMIN:
+        raise APIError("Admin registration is not allowed through public signup")
+
     normalized_email = validate_email(email)
     validate_password_strength(password)
 
@@ -54,6 +60,25 @@ async def signup(db: AsyncSession, full_name: str, email: str, password: str, ro
     await db.commit()
     await db.refresh(user)
     return access_token, refresh_token, user
+
+
+async def ensure_default_admin_user(db: AsyncSession) -> User | None:
+    existing_admin = await db.scalar(select(User).where(User.role == UserRole.ADMIN))
+    if existing_admin:
+        return existing_admin
+
+    admin_user = User(
+        full_name="System Administrator",
+        email=DEFAULT_ADMIN_EMAIL,
+        password_hash=hash_password(DEFAULT_ADMIN_PASSWORD),
+        role=UserRole.ADMIN,
+        is_verified=True,
+        is_active=True,
+    )
+    db.add(admin_user)
+    await db.commit()
+    await db.refresh(admin_user)
+    return admin_user
 
 
 async def login(db: AsyncSession, email: str, password: str) -> tuple[str, str, User]:

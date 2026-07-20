@@ -1,4 +1,7 @@
-from fastapi import FastAPI, HTTPException, Request
+import time
+from collections import defaultdict, deque
+
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
@@ -8,7 +11,9 @@ from starlette.status import HTTP_422_UNPROCESSABLE_ENTITY
 
 import app.database.base  # noqa: F401
 from app.api.v1.router import api_router
+from app.auth.service import ensure_default_admin_user
 from app.core.config import settings
+from app.database.session import AsyncSessionLocal
 
 app = FastAPI(title=settings.app_name)
 
@@ -16,11 +21,51 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.frontend_origin],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 app.include_router(api_router, prefix="/api/v1")
+
+_rate_limit_windows: dict[str, deque[float]] = defaultdict(deque)
+_rate_limited_paths = ("/api/v1/auth/login", "/api/v1/auth/signup", "/api/v1/auth/refresh", "/api/v1/contact")
+
+
+@app.middleware("http")
+async def security_middleware(request: Request, call_next):
+    if request.method != "OPTIONS" and request.url.path in _rate_limited_paths:
+        client = request.client.host if request.client else "unknown"
+        key = f"{client}:{request.url.path}"
+        now = time.monotonic()
+        window = _rate_limit_windows[key]
+        while window and now - window[0] > 60:
+            window.popleft()
+        if len(window) >= 20:
+            return JSONResponse(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                content={"success": False, "message": "Too many requests. Please try again later.", "errors": []},
+            )
+        window.append(now)
+
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    if request.url.scheme == "https":
+        response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+    return response
+
+
+@app.on_event("startup")
+async def seed_default_admin_user() -> None:
+    if settings.environment.lower() not in {"local", "development", "test"} and settings.jwt_secret_key == "change-me":
+        raise RuntimeError("JWT secret must be changed before running outside local development")
+    try:
+        async with AsyncSessionLocal() as db:
+            await ensure_default_admin_user(db)
+    except Exception:
+        pass
 
 
 def custom_openapi():
