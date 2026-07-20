@@ -16,4 +16,9 @@ export const queryKeys = {
   payments: ["payments", "history"],
   reviews: (id) => ["reviews", "creator", id],
   notifications: ["notifications"],
+  contactSubmissions: ["contact", "admin"],
+  adminStats: ["admin", "stats"],
+  adminUsers: ["admin", "users"],
+  adminRequirements: ["admin", "requirements"],
+  adminQuotations: ["admin", "quotations"],
 };

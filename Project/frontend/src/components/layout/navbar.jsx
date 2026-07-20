@@ -21,15 +21,16 @@ export function Navbar() {
   const notificationItems = asArray(notifications.data);
   const unreadNotifications = notificationItems.filter((item) => !item.is_read).length;
   useCurrentUser();
-  const dashboard = role === "CREATOR" ? "/dashboard/creator" : "/dashboard/customer";
+  const dashboard = role === "CREATOR" ? "/dashboard/creator" : role === "ADMIN" ? "/dashboard/admin" : "/dashboard/customer";
   const requirementsHref = role === "CREATOR" ? "/dashboard/creator/requirements" : "/dashboard/customer/requirements";
   const requirementsLabel = role === "CREATOR" ? "Requirements" : "My Requirements";
   const links = isAuthenticated
     ? [
         { href: "/creators", label: "Creators" },
         { href: requirementsHref, label: requirementsLabel },
+        { href: "/contact", label: "Contact" },
       ]
-    : [];
+    : [{ href: "/contact", label: "Contact" }];
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-white/95 backdrop-blur">

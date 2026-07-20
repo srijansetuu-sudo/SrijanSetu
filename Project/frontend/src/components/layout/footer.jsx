@@ -10,6 +10,7 @@ export function Footer() {
         </div>
         <div className="grid gap-2 text-sm">
           <Link href="/creators">Explore creators</Link>
+          <Link href="/contact">Contact us</Link>
         </div>
         <p className="text-sm text-muted-foreground">A place to discover original art, handcrafted decor, and meaningful commissions from artists and makers.</p>
       </div>

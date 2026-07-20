@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, Briefcase, CreditCard, FileText, Home, MessageSquare, Star, User } from "lucide-react";
+import { Bell, Briefcase, CreditCard, FileText, Headphones, Home, MessageSquare, Star, User, Users } from "lucide-react";
 import { cn, asArray } from "@/lib/utils";
 import { Navbar } from "@/components/layout/navbar";
 import { useApiQuery } from "@/hooks/use-api";
@@ -30,9 +30,19 @@ const creatorLinks = [
   { href: "/notifications", label: "Notifications", icon: Bell },
 ];
 
+const adminLinks = [
+  { href: "/dashboard/admin", label: "Overview", icon: Home },
+  { href: "/dashboard/admin/users", label: "Users", icon: Users },
+  { href: "/dashboard/admin/requirements", label: "Requirements", icon: FileText },
+  { href: "/dashboard/admin/quotations", label: "Quotations", icon: MessageSquare },
+  { href: "/workspaces", label: "Workspaces", icon: MessageSquare },
+  { href: "/dashboard/admin/contact", label: "Contact", icon: Headphones },
+  { href: "/notifications", label: "Notifications", icon: Bell },
+];
+
 export function DashboardShell({ role = "CUSTOMER", children }) {
   const pathname = usePathname();
-  const links = role === "CREATOR" ? creatorLinks : customerLinks;
+  const links = role === "CREATOR" ? creatorLinks : role === "ADMIN" ? adminLinks : customerLinks;
   const notifications = useApiQuery(queryKeys.notifications, notificationService.list, { refetchOnMount: "always" });
   const unreadNotifications = asArray(notifications.data).filter((item) => !item.is_read).length;
   return (

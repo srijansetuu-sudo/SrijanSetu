@@ -49,12 +49,28 @@ export const quotationService = {
   remove: (id) => data(api.delete(`/quotations/${id}`)),
 };
 
+export const adminService = {
+  stats: () => pick(api.get("/admin/stats"), "stats"),
+  users: () => data(api.get("/admin/users")),
+  deleteUser: (id) => data(api.delete(`/admin/users/${id}`)),
+  requirements: () => data(api.get("/admin/requirements")),
+  deleteRequirement: (id) => data(api.delete(`/admin/requirements/${id}`)),
+  quotations: () => data(api.get("/admin/quotations")),
+  deleteQuotation: (id) => data(api.delete(`/admin/quotations/${id}`)),
+};
+
 export const orderService = {
   list: () => data(api.get("/orders")),
   details: (id) => pick(api.get(`/orders/${id}`), "order"),
   updateStatus: (id, status) => pick(api.patch(`/orders/${id}/status`, { status }), "order"),
   files: (id) => data(api.get(`/orders/${id}/files`)),
   uploadFile: (id, payload) => pick(api.post(`/orders/${id}/files`, body(payload)), "file"),
+};
+
+export const contactService = {
+  create: (payload) => pick(api.post("/contact", body(payload)), "submission"),
+  adminList: (params) => data(api.get("/contact/admin", { params })),
+  adminUpdate: (id, payload) => pick(api.patch(`/contact/admin/${id}`, body(payload)), "submission"),
 };
 
 export const messageService = {

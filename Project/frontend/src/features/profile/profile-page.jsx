@@ -44,7 +44,9 @@ function Field({ label, required = false, children }) {
 }
 
 function profilePath(role) {
-  return role === "CREATOR" ? "/dashboard/creator" : "/dashboard/customer";
+  if (role === "CREATOR") return "/dashboard/creator";
+  if (role === "ADMIN") return "/dashboard/admin";
+  return "/dashboard/customer";
 }
 
 export function ProfilePage() {
