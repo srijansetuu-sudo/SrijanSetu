@@ -21,7 +21,7 @@ const steps = [
   "Artists share their craft, style, and availability",
   "Customers reserve a piece or start a custom request",
   "Artists create, refine, and deliver the final piece",
-  "Customers pay securely and leave a review",
+  "Customers pay the quoted amount securely and leave a review",
 ];
 const faqs = [
   {
@@ -29,12 +29,12 @@ const faqs = [
     answer: "Browse their style, story, materials, and past work to find a piece that feels personal and authentic.",
   },
   {
-    question: "Why is there an advance deposit?",
-    answer: "The deposit helps secure a custom commission or handmade order and is adjusted against the final amount.",
+    question: "Why is the full amount paid upfront?",
+    answer: "The upfront payment secures the custom work and stays with SrijanSetu until the project is completed.",
   },
   {
     question: "Can artists send proposals?",
-    answer: "Yes. Artists can share their approach, timeline, and a short note for each request.",
+    answer: "Yes. Artists can share their approach, timeline, included revisions, and a short note for each request.",
   },
   {
     question: "Where do project details stay?",

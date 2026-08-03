@@ -3,7 +3,7 @@ import { CalendarDays, IndianRupee, Sparkles, Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { WORKSPACE_ACTIVATION_DEPOSIT, dateLabel, money } from "@/lib/utils";
+import { dateLabel, money } from "@/lib/utils";
 
 export function CreatorCard({ creator }) {
   const id = creator.id ?? creator.creator_profile_id ?? creator.profile_id;
@@ -65,19 +65,20 @@ export function QuotationCard({ quotation, onAccept, onReject, onDelete }) {
           <div>
             <p className="font-bold text-primary">{money(quotation.proposed_price)}</p>
             <p className="mt-1 text-sm text-muted-foreground">{quotation.estimated_days} days</p>
+            <p className="mt-1 text-sm text-muted-foreground">{quotation.revisions_allowed ?? 0} revisions</p>
           </div>
           <Badge>{statusLabel}</Badge>
         </div>
         <p className="mt-4 text-sm text-muted-foreground">{quotation.message}</p>
         {onAccept ? (
           <div className="mt-4 rounded-lg border border-border bg-muted/60 p-3 text-sm">
-            <p className="font-semibold text-primary">Workspace starts with a {money(WORKSPACE_ACTIVATION_DEPOSIT)} advance deposit.</p>
-            <p className="mt-1 text-muted-foreground">This confirms the customer is serious and is adjusted against the final quoted amount.</p>
+            <p className="font-semibold text-primary">Workspace starts after paying the full quoted amount upfront.</p>
+            <p className="mt-1 text-muted-foreground">The amount stays with SrijanSetu until the project is completed.</p>
           </div>
         ) : null}
         {(onAccept || onReject || onDelete) ? (
           <div className="mt-5 flex gap-2">
-            {onAccept ? <Button size="sm" onClick={onAccept}>Accept and pay {money(WORKSPACE_ACTIVATION_DEPOSIT)}</Button> : null}
+            {onAccept ? <Button size="sm" onClick={onAccept}>Accept and pay {money(quotation.proposed_price)}</Button> : null}
             {onReject ? <Button size="sm" variant="outline" onClick={onReject}>Reject</Button> : null}
             {onDelete ? <Button size="sm" variant="outline" onClick={onDelete}>Delete</Button> : null}
           </div>

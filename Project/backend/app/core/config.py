@@ -1,4 +1,10 @@
+from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+BACKEND_ROOT = PROJECT_ROOT / "backend"
 
 
 class Settings(BaseSettings):
@@ -24,8 +30,17 @@ class Settings(BaseSettings):
     s3_endpoint_url: str | None = None
     s3_access_key_id: str | None = None
     s3_secret_access_key: str | None = None
+    contact_recipient_email: str = "srijan.setuu@gmail.com"
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_username: str | None = None
+    smtp_password: str | None = None
+    smtp_from_email: str | None = None
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(
+        env_file=(PROJECT_ROOT / ".env", BACKEND_ROOT / ".env"),
+        env_file_encoding="utf-8",
+    )
 
 
 settings = Settings()

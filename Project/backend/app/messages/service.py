@@ -20,7 +20,7 @@ async def _authorize_order(db: AsyncSession, user: User, order_id: UUID) -> Orde
     if user.role.value != "ADMIN" and user.id not in {order.customer_id, order.creator_id}:
         raise ForbiddenError("You cannot access messages for this order")
     if order.status == OrderStatus.PENDING:
-        raise APIError("Workspace messages unlock after the customer pays the activation deposit")
+        raise APIError("Workspace messages unlock after the customer pays the full quoted amount upfront")
     return order
 
 

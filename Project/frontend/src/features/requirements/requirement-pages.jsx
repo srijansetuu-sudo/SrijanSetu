@@ -22,7 +22,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { showFormValidationToast, useApiMutation, useApiQuery } from "@/hooks/use-api";
 import { queryKeys } from "@/constants/query-keys";
 import { paymentService, quotationService, requirementService, uploadService } from "@/services/api-services";
-import { WORKSPACE_ACTIVATION_DEPOSIT, asArray, dateLabel, money } from "@/lib/utils";
+import { asArray, dateLabel, money } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth-store";
 
 const RAZORPAY_CHECKOUT_SRC = "https://checkout.razorpay.com/v1/checkout.js";
@@ -77,10 +77,11 @@ const requirementSchema = z.object({
 const quotationSchema = z.object({
   proposed_price: z.coerce.number().positive("Proposed price must be greater than 0"),
   estimated_days: z.coerce.number().int("Estimated days must be a whole number").positive("Estimated days must be greater than 0"),
+  revisions_allowed: z.coerce.number().int("Revisions must be a whole number").min(0, "Revisions cannot be negative").max(20, "Revisions cannot exceed 20"),
   message: z.string().min(10, "Message must be at least 10 characters"),
 });
 
-function FormField({ label, children, required = false, description }) {
+function FormField({ label, children, required = false, description, error }) {
   return (
     <label className="grid gap-2 text-sm font-semibold text-primary">
       <span>
@@ -89,6 +90,7 @@ function FormField({ label, children, required = false, description }) {
       </span>
       {description ? <span className="text-xs font-normal text-muted-foreground">{description}</span> : null}
       {children}
+      {error ? <span className="text-xs font-semibold text-red-600">{error.message}</span> : null}
     </label>
   );
 }
@@ -144,6 +146,7 @@ export function RequirementDetailsPage() {
   const pricePresets = Array.from(new Set([budgetMin, budgetMid, budgetMax].filter(Boolean)));
   const selectedPrice = watch("proposed_price");
   const selectedDays = watch("estimated_days");
+  const selectedRevisions = watch("revisions_allowed");
   const message = watch("message") ?? "";
   const setQuoteValue = (name, value) => setValue(name, value, { shouldDirty: true, shouldValidate: true });
   const canQuote = item.status === "OPEN";
@@ -171,7 +174,7 @@ export function RequirementDetailsPage() {
                   <Sparkles className="h-5 w-5" />
                   <h2 className="font-bold">Quote preview</h2>
                 </div>
-                <div className="mt-5 grid gap-4 sm:grid-cols-3">
+                <div className="mt-5 grid gap-4 sm:grid-cols-4">
                   <div>
                     <p className="text-sm text-muted-foreground">Price</p>
                     <p className="mt-1 text-2xl font-bold text-primary">{selectedPrice ? money(selectedPrice) : "--"}</p>
@@ -179,6 +182,10 @@ export function RequirementDetailsPage() {
                   <div>
                     <p className="text-sm text-muted-foreground">Timeline</p>
                     <p className="mt-1 text-2xl font-bold text-primary">{selectedDays ? `${selectedDays} days` : "--"}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Revisions</p>
+                    <p className="mt-1 text-2xl font-bold text-primary">{selectedRevisions ?? 0}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Message</p>
@@ -238,6 +245,16 @@ export function RequirementDetailsPage() {
                       </Button>
                     ))}
                   </div>
+                  <FormField label="Revisions included" error={errors.revisions_allowed} description="How many change requests are included in this quote.">
+                    <Input className="h-14 text-lg font-bold text-primary" type="number" min="0" max="20" defaultValue="0" {...register("revisions_allowed")} />
+                  </FormField>
+                  <div className="grid grid-cols-4 gap-2">
+                    {[0, 1, 2, 3].map((revisions) => (
+                      <Button key={revisions} type="button" variant="outline" size="sm" onClick={() => setQuoteValue("revisions_allowed", revisions)}>
+                        {revisions}
+                      </Button>
+                    ))}
+                  </div>
                   <FormField label="Message" error={errors.message}>
                     <Textarea className="min-h-36 resize-none leading-6" maxLength={140} {...register("message")} />
                   </FormField>
@@ -249,6 +266,10 @@ export function RequirementDetailsPage() {
                     <div className="mt-2 flex items-center justify-between text-sm">
                       <span className="font-semibold text-muted-foreground">Delivery</span>
                       <span className="font-bold text-primary">{selectedDays ? `${selectedDays} days` : "--"}</span>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between text-sm">
+                      <span className="font-semibold text-muted-foreground">Revisions</span>
+                      <span className="font-bold text-primary">{selectedRevisions ?? 0}</span>
                     </div>
                   </div>
                   <Button className="h-12 text-base" disabled={quote.isPending}>
@@ -400,15 +421,16 @@ export function RequirementQuotationsPage() {
   const quotations = asArray(query.data);
   const hasActiveAcceptedQuotation = quotations.some((quotation) => quotation.status === "ACCEPTED" && quotation.order_status !== "PENDING");
 
-  const openDepositCheckout = async (order, quotation) => {
+  const openUpfrontCheckout = async (order, quotation) => {
     const isLocalBypass = process.env.NODE_ENV !== "production";
     const razorpayKey = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
     if (!razorpayKey && !isLocalBypass) {
       showFormValidationToast({ payment: { message: "Razorpay public key is not configured" } });
       return;
     }
+    const amount = Number(order.total_amount ?? quotation.proposed_price ?? 0);
     if (isLocalBypass) {
-      createPayment.mutate({ order_id: order.id, amount: Math.min(Number(order.total_amount ?? quotation.proposed_price ?? 0), WORKSPACE_ACTIVATION_DEPOSIT), payment_method: "workspace_activation" }, {
+      createPayment.mutate({ order_id: order.id, amount, payment_method: "project_upfront" }, {
         onSuccess: (payment) => {
           verifyPayment.mutate({
             paymentId: payment.id,
@@ -427,15 +449,14 @@ export function RequirementQuotationsPage() {
       showFormValidationToast({ payment: { message: "Razorpay checkout could not be loaded" } });
       return;
     }
-    const amount = Math.min(Number(order.total_amount ?? quotation.proposed_price ?? 0), WORKSPACE_ACTIVATION_DEPOSIT);
-    createPayment.mutate({ order_id: order.id, amount, payment_method: "workspace_activation" }, {
+    createPayment.mutate({ order_id: order.id, amount, payment_method: "project_upfront" }, {
       onSuccess: (payment) => {
         const checkout = new window.Razorpay({
           key: razorpayKey,
           amount: Math.round(Number(payment.amount) * 100),
           currency: "INR",
           name: "SrijanSetu",
-          description: "Advance workspace deposit",
+          description: "Full project amount upfront",
           order_id: payment.razorpay_order_id,
           method: {
             upi: true,
@@ -473,10 +494,10 @@ export function RequirementQuotationsPage() {
 
   const acceptAndPay = (quotation) => {
     if (quotation.order_id && quotation.order_status === "PENDING") {
-      openDepositCheckout({ id: quotation.order_id, total_amount: quotation.proposed_price }, quotation);
+      openUpfrontCheckout({ id: quotation.order_id, total_amount: quotation.proposed_price }, quotation);
       return;
     }
-    accept.mutate(quotation.id, { onSuccess: (order) => openDepositCheckout(order, quotation) });
+    accept.mutate(quotation.id, { onSuccess: (order) => openUpfrontCheckout(order, quotation) });
   };
 
   return <ProtectedRoute roles={["CUSTOMER"]}><DashboardShell><h1 className="text-3xl font-bold text-primary">Quotations Received</h1><div className="mt-6 grid gap-4">{query.isLoading ? <LoadingState /> : quotations.length ? quotations.map((quotation) => {

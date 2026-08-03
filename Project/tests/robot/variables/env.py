@@ -5,7 +5,7 @@ from pathlib import Path
 
 def load_env_file():
     project_root = Path(__file__).resolve().parents[3]
-    for env_file in (project_root / ".env.testing", project_root / ".env.testing.example"):
+    for env_file in (project_root / ".env", project_root / ".env.testing", project_root / ".env.example", project_root / ".env.testing.example"):
         if not env_file.exists():
             continue
         for line in env_file.read_text().splitlines():

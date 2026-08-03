@@ -10,10 +10,9 @@ Use Docker for PostgreSQL locally:
 docker compose up -d postgres
 ```
 
-Create backend env:
+Create the shared env file:
 
 ```bash
-cd backend
 copy .env.example .env
 ```
 
@@ -41,7 +40,6 @@ Start frontend:
 
 ```bash
 cd frontend
-copy .env.example .env.local
 npm install
 npm run dev
 ```
@@ -65,13 +63,14 @@ Use managed services:
 - Images: Cloudinary
 - Payments: Razorpay
 
-In production, set these environment variables on the hosting platform:
+In production, set the same root `.env.example` variables on the hosting platforms. Backend-only variables belong on the backend host, and `NEXT_PUBLIC_*` variables belong on the frontend host:
 
 ```env
 APP_NAME=SrijanSetu API
 ENVIRONMENT=production
 DATABASE_URL=postgresql+psycopg://USER:PASSWORD@HOST:5432/DB_NAME
 JWT_SECRET=use-a-long-random-secret
+JWT_SECRET_KEY=use-a-long-random-secret
 JWT_ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 REFRESH_TOKEN_EXPIRE_DAYS=7
@@ -80,12 +79,8 @@ RAZORPAY_KEY_SECRET=your-secret
 RAZORPAY_WEBHOOK_SECRET=your-webhook-secret
 COMMISSION_PERCENT=15
 FRONTEND_ORIGIN=https://your-frontend-domain.com
-```
-
-On Vercel frontend, set:
-
-```env
-NEXT_PUBLIC_API_BASE_URL=https://your-backend-domain.com/api/v1
+NEXT_PUBLIC_API_URL=https://your-backend-domain.com/api/v1
+NEXT_PUBLIC_RAZORPAY_KEY_ID=your-live-or-test-key
 ```
 
 ## Production Migration Flow
@@ -102,4 +97,3 @@ Run migrations from a controlled deploy step or from the hosting provider shell.
 ## Important Rule
 
 The app should never hardcode database credentials. Only `DATABASE_URL` changes between local Docker PostgreSQL and production managed PostgreSQL.
-

@@ -1,5 +1,4 @@
 from datetime import UTC, datetime
-from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import or_, select
@@ -12,8 +11,6 @@ from app.orders.models import Order, OrderFile, OrderStatus
 from app.orders.schemas import OrderFileCreate, OrderStatusUpdate
 from app.payments.models import Payment, PaymentStatus
 from app.users.models import User
-
-WORKSPACE_ACTIVATION_DEPOSIT = Decimal("75.00")
 
 
 async def _get_authorized_order(db: AsyncSession, user: User, order_id: UUID) -> Order:
@@ -70,15 +67,15 @@ async def update_status(db: AsyncSession, user: User, order_id: UUID, payload: O
     if payload.status not in allowed_transitions[order.status]:
         raise APIError(f"Cannot change order status from {order.status.value} to {payload.status.value}")
     if order.status == OrderStatus.PENDING and payload.status == OrderStatus.ACTIVE:
-        activation_payment = await db.scalar(
+        upfront_payment = await db.scalar(
             select(Payment).where(
                 Payment.order_id == order.id,
-                Payment.amount == WORKSPACE_ACTIVATION_DEPOSIT,
+                Payment.amount == order.total_amount,
                 Payment.payment_status == PaymentStatus.SUCCESS,
             )
         )
-        if not activation_payment:
-            raise APIError("Workspace starts after the customer pays the Rs. 75 activation deposit")
+        if not upfront_payment:
+            raise APIError("Workspace starts after the customer pays the full quoted amount upfront")
     order.status = payload.status
     if payload.status == OrderStatus.ACTIVE and not order.started_at:
         order.started_at = datetime.now(UTC)
@@ -98,7 +95,7 @@ async def update_status(db: AsyncSession, user: User, order_id: UUID, payload: O
 async def add_file(db: AsyncSession, user: User, order_id: UUID, payload: OrderFileCreate) -> OrderFile:
     order = await _get_authorized_order(db, user, order_id)
     if order.status == OrderStatus.PENDING:
-        raise APIError("Workspace starts after the customer pays the activation deposit")
+        raise APIError("Workspace starts after the customer pays the full quoted amount upfront")
     if user.id != order.creator_id:
         raise ForbiddenError("Only the assigned creator can upload order files")
     order_file = OrderFile(order_id=order.id, uploaded_by=user.id, **payload.model_dump())

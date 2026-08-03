@@ -16,20 +16,8 @@ from app.payments.models import Payment, PaymentStatus
 from app.payments.schemas import PaymentCreate, PaymentVerify
 from app.users.models import User
 
-WORKSPACE_ACTIVATION_DEPOSIT = Decimal("75.00")
-
-
 def _money(value: Decimal) -> Decimal:
     return Decimal(str(value)).quantize(Decimal("0.01"))
-
-
-def _activation_deposit_for(order: Order) -> Decimal:
-    total = _money(order.total_amount)
-    return min(total, WORKSPACE_ACTIVATION_DEPOSIT)
-
-
-def _remaining_creator_payment_for(order: Order) -> Decimal:
-    return max(Decimal("0.00"), _money(order.total_amount) - _activation_deposit_for(order))
 
 
 def _razorpay_configured() -> bool:
@@ -101,13 +89,8 @@ async def create_payment(db: AsyncSession, user: User, payload: PaymentCreate) -
     if _amount_to_paise(payload.amount) < 100:
         raise APIError("Minimum payment amount is 100 paise")
     payment_amount = _money(payload.amount)
-    allowed_amounts = {
-        _money(order.total_amount),
-        _activation_deposit_for(order),
-        _remaining_creator_payment_for(order),
-    }
-    if payment_amount not in allowed_amounts:
-        raise APIError("Payment amount must match the order total, advance deposit, or remaining project amount")
+    if payment_amount != _money(order.total_amount):
+        raise APIError("Payment amount must match the full order total")
     existing_success = await db.scalar(
         select(Payment).where(
             Payment.order_id == order.id,
@@ -164,7 +147,7 @@ async def verify_payment(db: AsyncSession, user: User, payment_id: UUID, payload
             _verify_razorpay_signature(payment.razorpay_order_id, payload.razorpay_payment_id, payload.razorpay_signature)
     payment.razorpay_payment_id = payload.razorpay_payment_id
     payment.payment_status = payload.status
-    if payload.status == PaymentStatus.SUCCESS and Decimal(str(payment.amount)) == WORKSPACE_ACTIVATION_DEPOSIT and order.status == OrderStatus.PENDING:
+    if payload.status == PaymentStatus.SUCCESS and _money(payment.amount) == _money(order.total_amount) and order.status == OrderStatus.PENDING:
         order.status = OrderStatus.ACTIVE
         order.started_at = datetime.now(UTC)
     queue_notification(

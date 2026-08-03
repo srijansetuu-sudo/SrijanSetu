@@ -23,6 +23,7 @@ class Quotation(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     creator_id: Mapped[UUID] = mapped_column(PgUUID(as_uuid=True), ForeignKey("users.id"), index=True, nullable=False)
     proposed_price: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
     estimated_days: Mapped[int] = mapped_column(Integer, nullable=False)
+    revisions_allowed: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     message: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[QuotationStatus] = mapped_column(SqlEnum(QuotationStatus), default=QuotationStatus.PENDING, index=True, nullable=False)
 

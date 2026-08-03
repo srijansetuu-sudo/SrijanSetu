@@ -59,6 +59,6 @@ cd backend
 alembic upgrade head
 ```
 
-Copy `.env.example` files before running real services.
+Copy the root `.env.example` to `.env` before running real services. Keep all private backend and frontend environment variables in that single root `.env` file.
 
 See [DEPLOYMENT.md](DEPLOYMENT.md) for the local-to-production path.

@@ -36,7 +36,7 @@ const adminLinks = [
   { href: "/dashboard/admin/requirements", label: "Requirements", icon: FileText },
   { href: "/dashboard/admin/quotations", label: "Quotations", icon: MessageSquare },
   { href: "/workspaces", label: "Workspaces", icon: MessageSquare },
-  { href: "/dashboard/admin/contact", label: "Contact", icon: Headphones },
+  { href: "/dashboard/admin/contact", label: "Contact inbox", icon: Headphones },
   { href: "/notifications", label: "Notifications", icon: Bell },
 ];
 

@@ -19,7 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { showFormValidationToast, useApiMutation, useApiQuery } from "@/hooks/use-api";
 import { queryKeys } from "@/constants/query-keys";
 import { messageService, orderService, paymentService, reviewService, uploadService } from "@/services/api-services";
-import { WORKSPACE_ACTIVATION_DEPOSIT, asArray, dateLabel, money } from "@/lib/utils";
+import { asArray, dateLabel, money } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth-store";
 
 const messageSchema = z.object({
@@ -239,9 +239,7 @@ export function OrderWorkspacePage() {
 
   const currentOrder = order.data ?? {};
   const creatorName = personName(currentOrder.creator, "Creator");
-  const canPayCreator = ["DELIVERED", "COMPLETED"].includes(currentOrder.status);
-  const activationDeposit = Math.min(Number(currentOrder.total_amount ?? 0), WORKSPACE_ACTIVATION_DEPOSIT);
-  const remainingCreatorPayment = Math.max(0, Number(currentOrder.total_amount ?? 0) - activationDeposit);
+  const upfrontAmount = Number(currentOrder.total_amount ?? 0);
 
   const startRazorpayPayment = async ({ amount, paymentMethod, description }) => {
     const isLocalBypass = process.env.NODE_ENV !== "production";
@@ -324,7 +322,7 @@ export function OrderWorkspacePage() {
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div className="min-w-0">
                     <h1 className="truncate text-3xl font-bold text-primary">{currentOrder.requirement_title || "Order Workspace"}</h1>
-                    <p className="mt-2 text-muted-foreground">{isPendingActivation ? "Workspace opens after the advance deposit is paid." : `Started ${dateLabel(currentOrder.started_at || currentOrder.created_at)}`}</p>
+                    <p className="mt-2 text-muted-foreground">{isPendingActivation ? "Workspace opens after the full quoted amount is paid upfront." : `Started ${dateLabel(currentOrder.started_at || currentOrder.created_at)}`}</p>
                   </div>
                   <Badge variant="primary">{currentOrder.status}</Badge>
                 </div>
@@ -339,19 +337,10 @@ export function OrderWorkspacePage() {
                     {isPendingActivation ? <div className="rounded-lg border border-border bg-muted/60 p-4 sm:col-span-3">
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
-                          <p className="font-bold text-primary">Advance workspace deposit: {money(activationDeposit)}</p>
-                          <p className="mt-1 text-sm text-muted-foreground">This amount confirms your acceptance and is adjusted against the final project payment.</p>
+                          <p className="font-bold text-primary">Full upfront project amount: {money(upfrontAmount)}</p>
+                          <p className="mt-1 text-sm text-muted-foreground">This amount stays with SrijanSetu until the project is completed.</p>
                         </div>
-                        <Button size="sm" variant="accent" disabled={createPayment.isPending || verifyPayment.isPending} onClick={() => startRazorpayPayment({ amount: activationDeposit, paymentMethod: "workspace_activation", description: "Advance workspace deposit" })}>Pay {money(activationDeposit)}</Button>
-                      </div>
-                    </div> : null}
-                    {canPayCreator ? <div className="rounded-lg border border-border bg-white p-4 sm:col-span-3">
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                          <p className="font-bold text-primary">Remaining project payment: {money(remainingCreatorPayment)}</p>
-                          <p className="mt-1 text-sm text-muted-foreground">The advance deposit is already counted, so this pays the remaining quoted amount after delivery.</p>
-                        </div>
-                        <Button size="sm" disabled={remainingCreatorPayment <= 0 || createPayment.isPending || verifyPayment.isPending} onClick={() => startRazorpayPayment({ amount: remainingCreatorPayment, paymentMethod: "creator_project_payment", description: "Remaining project payment" })}>Pay Remaining</Button>
+                        <Button size="sm" variant="accent" disabled={createPayment.isPending || verifyPayment.isPending} onClick={() => startRazorpayPayment({ amount: upfrontAmount, paymentMethod: "project_upfront", description: "Full project amount upfront" })}>Pay {money(upfrontAmount)}</Button>
                       </div>
                     </div> : null}
                   </RoleGuard>

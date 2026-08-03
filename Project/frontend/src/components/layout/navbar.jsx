@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Bell, ChevronDown, LayoutDashboard, LogOut, Menu, MessageSquare, UserCircle } from "lucide-react";
+import { Bell, ChevronDown, Headphones, LayoutDashboard, LogOut, Menu, MessageSquare, UserCircle } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { queryKeys } from "@/constants/query-keys";
@@ -22,15 +22,18 @@ export function Navbar() {
   const unreadNotifications = notificationItems.filter((item) => !item.is_read).length;
   useCurrentUser();
   const dashboard = role === "CREATOR" ? "/dashboard/creator" : role === "ADMIN" ? "/dashboard/admin" : "/dashboard/customer";
-  const requirementsHref = role === "CREATOR" ? "/dashboard/creator/requirements" : "/dashboard/customer/requirements";
-  const requirementsLabel = role === "CREATOR" ? "Requirements" : "My Requirements";
-  const links = isAuthenticated
+  const links = role === "ADMIN"
     ? [
-        { href: "/creators", label: "Creators" },
-        { href: requirementsHref, label: requirementsLabel },
-        { href: "/contact", label: "Contact" },
+        { href: "/dashboard/admin", label: "Admin dashboard" },
+        { href: "/dashboard/admin/contact", label: "Contact inbox" },
       ]
-    : [{ href: "/contact", label: "Contact" }];
+    : isAuthenticated
+      ? [
+          { href: "/creators", label: "Creators" },
+          { href: role === "CREATOR" ? "/dashboard/creator/requirements" : "/dashboard/customer/requirements", label: role === "CREATOR" ? "Requirements" : "My Requirements" },
+          { href: "/contact", label: "Contact" },
+        ]
+      : [{ href: "/contact", label: "Contact" }];
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-white/95 backdrop-blur">
@@ -61,6 +64,7 @@ export function Navbar() {
               <div className={`absolute right-0 mt-2 w-56 origin-top-right rounded-lg border border-border bg-white p-2 shadow-xl transition-all duration-200 ease-out ${profileOpen ? "visible pointer-events-auto translate-y-0 scale-100 opacity-100" : "invisible pointer-events-none -translate-y-2 scale-95 opacity-0"}`}>
                 <Link href="/profile" onClick={() => setProfileOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold text-primary transition duration-150 hover:translate-x-0.5 hover:bg-muted"><UserCircle className="h-4 w-4" />Profile overview</Link>
                 <Link href={dashboard} onClick={() => setProfileOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold text-primary transition duration-150 hover:translate-x-0.5 hover:bg-muted"><LayoutDashboard className="h-4 w-4" />Dashboard</Link>
+                {role === "ADMIN" ? <Link href="/dashboard/admin/contact" onClick={() => setProfileOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold text-primary transition duration-150 hover:translate-x-0.5 hover:bg-muted"><Headphones className="h-4 w-4" />Contact inbox</Link> : null}
                 <Link href="/workspaces" onClick={() => setProfileOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold text-primary transition duration-150 hover:translate-x-0.5 hover:bg-muted"><MessageSquare className="h-4 w-4" />Workspaces</Link>
                 <Link href="/notifications" onClick={() => setProfileOpen(false)} className="flex items-center justify-between rounded-lg px-3 py-2 text-sm font-semibold text-primary transition duration-150 hover:translate-x-0.5 hover:bg-muted">
                   <span className="flex items-center gap-3"><Bell className="h-4 w-4" />Notifications</span>
