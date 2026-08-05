@@ -28,6 +28,9 @@ class OrderRead(BaseModel):
     status: OrderStatus
     started_at: datetime | None
     completed_at: datetime | None
+    customer_completed_at: datetime | None
+    creator_completed_at: datetime | None
+    payout_ready_at: datetime | None
     created_at: datetime
     updated_at: datetime
 

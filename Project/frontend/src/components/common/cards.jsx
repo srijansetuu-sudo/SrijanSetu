@@ -34,7 +34,7 @@ export function CreatorCard({ creator }) {
   );
 }
 
-export function RequirementCard({ requirement, href }) {
+export function RequirementCard({ requirement, href, actionLabel = "View requirement" }) {
   return (
     <Card className="overflow-hidden">
       <div className="h-1.5 bg-gradient-to-r from-primary via-[#4050a5] to-accent" />
@@ -50,7 +50,7 @@ export function RequirementCard({ requirement, href }) {
           <span className="flex items-center gap-1"><IndianRupee className="h-4 w-4" />{money(requirement.budget_min)} - {money(requirement.budget_max)}</span>
           <span className="flex items-center gap-1"><CalendarDays className="h-4 w-4" />{dateLabel(requirement.deadline)}</span>
         </div>
-        <Button asChild="true" className="mt-5" variant="outline" size="sm"><Link href={href ?? `/requirements/${requirement.id}`}>View requirement</Link></Button>
+        <Button asChild="true" className="mt-5" variant="outline" size="sm"><Link href={href ?? `/requirements/${requirement.id}`}>{actionLabel}</Link></Button>
       </CardContent>
     </Card>
   );

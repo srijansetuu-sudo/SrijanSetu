@@ -291,7 +291,11 @@ export function RequirementDetailsPage() {
 
 export function MyRequirementsPage() {
   const query = useApiQuery(queryKeys.myRequirements, requirementService.my);
-  return <ProtectedRoute roles={["CUSTOMER"]}><DashboardShell><div className="flex items-center justify-between"><h1 className="text-3xl font-bold text-primary">My Requirements</h1><Button asChild variant="accent"><Link href="/dashboard/customer/requirements/new">Create</Link></Button></div><div className="mt-6 grid gap-5">{query.isLoading ? <LoadingState /> : asArray(query.data).length ? asArray(query.data).map((item) => <RequirementCard key={item.id} requirement={item} href={`/dashboard/customer/requirements/${item.id}`} />) : <EmptyState title="No requirements posted" />}</div></DashboardShell></ProtectedRoute>;
+  return <ProtectedRoute roles={["CUSTOMER"]}><DashboardShell><div className="flex items-center justify-between"><h1 className="text-3xl font-bold text-primary">My Requirements</h1><Button asChild variant="accent"><Link href="/dashboard/customer/requirements/new">Create</Link></Button></div><div className="mt-6 grid gap-5">{query.isLoading ? <LoadingState /> : asArray(query.data).length ? asArray(query.data).map((item) => {
+    const hasWorkspace = item.status !== "OPEN";
+    const workspaceHref = item.order_id ? `/orders/${item.order_id}` : "/workspaces";
+    return <RequirementCard key={item.id} requirement={item} href={hasWorkspace ? workspaceHref : `/dashboard/customer/requirements/${item.id}`} actionLabel={hasWorkspace ? "View workspace" : "View quotations"} />;
+  }) : <EmptyState title="No requirements posted" />}</div></DashboardShell></ProtectedRoute>;
 }
 
 export function RequirementFormPage() {
@@ -403,7 +407,9 @@ export function CustomerRequirementDetailsPage() {
   const remove = useApiMutation(() => requirementService.remove(id), { successMessage: "Requirement deleted", invalidate: queryKeys.myRequirements, onSuccess: () => router.push("/dashboard/customer/requirements") });
   const addRef = useApiMutation((payload) => requirementService.references(id, payload), { successMessage: "Reference added", invalidate: queryKeys.requirement(id) });
   const item = query.data ?? {};
-  return <ProtectedRoute roles={["CUSTOMER"]}><DashboardShell><div className="grid gap-6">{query.isLoading ? <LoadingState /> : <Card><CardContent><h1 className="text-3xl font-bold text-primary">{item.title}</h1><p className="mt-3 text-muted-foreground">{item.description}</p><div className="mt-6 flex flex-wrap gap-3"><Button asChild variant="outline"><Link href={`/dashboard/customer/requirements/${id}/quotations`}>View quotations</Link></Button><Button variant="outline" onClick={() => remove.mutate()}>Delete</Button></div></CardContent></Card>}</div></DashboardShell></ProtectedRoute>;
+  const hasWorkspace = item.status !== "OPEN";
+  const workspaceHref = item.order_id ? `/orders/${item.order_id}` : "/workspaces";
+  return <ProtectedRoute roles={["CUSTOMER"]}><DashboardShell><div className="grid gap-6">{query.isLoading ? <LoadingState /> : <Card><CardContent><h1 className="text-3xl font-bold text-primary">{item.title}</h1><p className="mt-3 text-muted-foreground">{item.description}</p><div className="mt-6 flex flex-wrap gap-3"><Button asChild variant="outline"><Link href={hasWorkspace ? workspaceHref : `/dashboard/customer/requirements/${id}/quotations`}>{hasWorkspace ? "View workspace" : "View quotations"}</Link></Button>{hasWorkspace ? null : <Button variant="outline" onClick={() => remove.mutate()}>Delete</Button>}</div></CardContent></Card>}</div></DashboardShell></ProtectedRoute>;
 }
 
 export function RequirementQuotationsPage() {
@@ -422,28 +428,12 @@ export function RequirementQuotationsPage() {
   const hasActiveAcceptedQuotation = quotations.some((quotation) => quotation.status === "ACCEPTED" && quotation.order_status !== "PENDING");
 
   const openUpfrontCheckout = async (order, quotation) => {
-    const isLocalBypass = process.env.NODE_ENV !== "production";
     const razorpayKey = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
-    if (!razorpayKey && !isLocalBypass) {
+    if (!razorpayKey) {
       showFormValidationToast({ payment: { message: "Razorpay public key is not configured" } });
       return;
     }
     const amount = Number(order.total_amount ?? quotation.proposed_price ?? 0);
-    if (isLocalBypass) {
-      createPayment.mutate({ order_id: order.id, amount, payment_method: "project_upfront" }, {
-        onSuccess: (payment) => {
-          verifyPayment.mutate({
-            paymentId: payment.id,
-            payload: {
-              razorpay_payment_id: `local_test_${payment.id}`,
-              razorpay_order_id: payment.razorpay_order_id,
-              status: "SUCCESS",
-            },
-          }, { onSuccess: () => router.push(`/orders/${order.id}`) });
-        },
-      });
-      return;
-    }
     const loaded = await loadRazorpayCheckout();
     if (!loaded) {
       showFormValidationToast({ payment: { message: "Razorpay checkout could not be loaded" } });

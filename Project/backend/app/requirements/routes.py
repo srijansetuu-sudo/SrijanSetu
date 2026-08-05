@@ -14,23 +14,32 @@ from app.users.models import User
 router = APIRouter(prefix="/requirements", tags=["requirements"])
 
 
+def _requirement_payload(requirement):
+    item = RequirementRead.model_validate(requirement).model_dump(mode="json")
+    order = getattr(requirement, "order", None)
+    if order:
+        item["order_id"] = str(order.id)
+        item["order_status"] = order.status.value
+    return item
+
+
 @router.post("", response_model=APIResponse)
 async def create_requirement(payload: RequirementCreate, db: AsyncSession = Depends(get_db), user: User = Depends(require_customer)):
     requirement = await service.create_requirement(db, user, payload)
-    return APIResponse(message="Requirement created", data={"requirement": RequirementRead.model_validate(requirement).model_dump(mode="json")})
+    return APIResponse(message="Requirement created", data={"requirement": _requirement_payload(requirement)})
 
 
 @router.get("", response_model=APIResponse)
 async def list_requirements(limit: int = Query(20, ge=1, le=100), offset: int = Query(0, ge=0), db: AsyncSession = Depends(get_db), user: User = Depends(require_creator)):
     requirements = await service.list_requirements(db, limit, offset)
-    items = [RequirementRead.model_validate(item).model_dump(mode="json") for item in requirements]
+    items = [_requirement_payload(item) for item in requirements]
     return APIResponse(data={"items": items, "limit": limit, "offset": offset})
 
 
 @router.get("/my", response_model=APIResponse)
 async def my_requirements(db: AsyncSession = Depends(get_db), user: User = Depends(get_current_active_user)):
     requirements = await service.list_my_requirements(db, user)
-    items = [RequirementRead.model_validate(item).model_dump(mode="json") for item in requirements]
+    items = [_requirement_payload(item) for item in requirements]
     return APIResponse(data={"items": items})
 
 
@@ -39,13 +48,13 @@ async def get_requirement(requirement_id: UUID, db: AsyncSession = Depends(get_d
     requirement = await service.get_requirement(db, requirement_id)
     if user.role.value == "CUSTOMER" and requirement.customer_id != user.id:
         raise ForbiddenError("Customers can only view their own requirements")
-    return APIResponse(data={"requirement": RequirementRead.model_validate(requirement).model_dump(mode="json")})
+    return APIResponse(data={"requirement": _requirement_payload(requirement)})
 
 
 @router.patch("/{requirement_id}", response_model=APIResponse)
 async def update_requirement(requirement_id: UUID, payload: RequirementUpdate, db: AsyncSession = Depends(get_db), user: User = Depends(require_customer)):
     requirement = await service.update_requirement(db, user, requirement_id, payload)
-    return APIResponse(message="Requirement updated", data={"requirement": RequirementRead.model_validate(requirement).model_dump(mode="json")})
+    return APIResponse(message="Requirement updated", data={"requirement": _requirement_payload(requirement)})
 
 
 @router.delete("/{requirement_id}", response_model=APIResponse)

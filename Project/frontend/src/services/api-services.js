@@ -63,6 +63,7 @@ export const orderService = {
   list: () => data(api.get("/orders")),
   details: (id) => pick(api.get(`/orders/${id}`), "order"),
   updateStatus: (id, status) => pick(api.patch(`/orders/${id}/status`, { status }), "order"),
+  confirmCompletion: (id) => pick(api.post(`/orders/${id}/confirm-completion`), "order"),
   files: (id) => data(api.get(`/orders/${id}/files`)),
   uploadFile: (id, payload) => pick(api.post(`/orders/${id}/files`, body(payload)), "file"),
 };
@@ -89,8 +90,8 @@ export const uploadService = {
 };
 
 export const paymentService = {
-  create: (payload) => pick(api.post("/payments", body(payload)), "payment"),
-  verify: (id, payload) => pick(api.patch(`/payments/${id}/verify`, body(payload)), "payment"),
+  create: (payload) => pick(api.post("/payments/create-order", body(payload)), "payment"),
+  verify: (id, payload) => pick(api.post("/payments/verify-payment", body({ payment_id: id, ...payload })), "payment"),
   history: () => data(api.get("/payments/history")),
 };
 

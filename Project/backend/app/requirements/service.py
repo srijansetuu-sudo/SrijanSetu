@@ -2,6 +2,7 @@ from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.exceptions import ForbiddenError, NotFoundError
 from app.notifications.service import queue_for_creators
@@ -30,6 +31,7 @@ async def create_requirement(db: AsyncSession, user: User, payload: RequirementC
 async def list_requirements(db: AsyncSession, limit: int, offset: int) -> list[Requirement]:
     result = await db.scalars(
         select(Requirement)
+        .options(selectinload(Requirement.order))
         .where(Requirement.status == RequirementStatus.OPEN)
         .order_by(Requirement.created_at.desc())
         .offset(offset)
@@ -40,13 +42,20 @@ async def list_requirements(db: AsyncSession, limit: int, offset: int) -> list[R
 
 async def list_my_requirements(db: AsyncSession, user: User) -> list[Requirement]:
     result = await db.scalars(
-        select(Requirement).where(Requirement.customer_id == user.id).order_by(Requirement.created_at.desc())
+        select(Requirement)
+        .options(selectinload(Requirement.order))
+        .where(Requirement.customer_id == user.id)
+        .order_by(Requirement.created_at.desc())
     )
     return list(result)
 
 
 async def get_requirement(db: AsyncSession, requirement_id: UUID) -> Requirement:
-    requirement = await db.get(Requirement, requirement_id)
+    requirement = await db.scalar(
+        select(Requirement)
+        .options(selectinload(Requirement.order))
+        .where(Requirement.id == requirement_id)
+    )
     if not requirement:
         raise NotFoundError("Requirement not found")
     return requirement

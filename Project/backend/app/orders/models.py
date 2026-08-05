@@ -31,6 +31,9 @@ class Order(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     status: Mapped[OrderStatus] = mapped_column(SqlEnum(OrderStatus), default=OrderStatus.PENDING, index=True, nullable=False)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    customer_completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    creator_completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    payout_ready_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     requirement = relationship("Requirement", back_populates="order")
     quotation = relationship("Quotation", back_populates="order")

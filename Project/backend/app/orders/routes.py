@@ -21,6 +21,11 @@ def _participant_payload(user: User | None) -> dict | None:
         "id": str(user.id),
         "full_name": user.full_name,
         "avatar_url": user.avatar_url,
+        "phone_number": user.phone_number,
+        "address_line": user.address_line,
+        "city": user.city,
+        "state": user.state,
+        "postal_code": user.postal_code,
         "creator_profile_id": str(profile.id) if profile else None,
         "brand_name": profile.brand_name if profile else None,
     }
@@ -28,6 +33,7 @@ def _participant_payload(user: User | None) -> dict | None:
 
 def _order_payload(order) -> dict:
     item = OrderRead.model_validate(order).model_dump(mode="json")
+    item["creator_payout_amount"] = str(order.total_amount - order.platform_commission)
     item["requirement_title"] = order.requirement.title if getattr(order, "requirement", None) else None
     item["customer"] = _participant_payload(getattr(order, "customer", None))
     item["creator"] = _participant_payload(getattr(order, "creator", None))
@@ -51,6 +57,12 @@ async def get_order(order_id: UUID, db: AsyncSession = Depends(get_db), user: Us
 async def update_status(order_id: UUID, payload: OrderStatusUpdate, db: AsyncSession = Depends(get_db), user: User = Depends(require_creator)):
     order = await service.update_status(db, user, order_id, payload)
     return APIResponse(message="Order status updated", data={"order": _order_payload(order)})
+
+
+@router.post("/{order_id}/confirm-completion", response_model=APIResponse)
+async def confirm_completion(order_id: UUID, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_active_user)):
+    order = await service.confirm_completion(db, user, order_id)
+    return APIResponse(message="Completion confirmed", data={"order": _order_payload(order)})
 
 
 @router.post("/{order_id}/files", response_model=APIResponse)

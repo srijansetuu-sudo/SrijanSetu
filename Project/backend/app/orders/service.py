@@ -10,6 +10,7 @@ from app.notifications.service import queue_notification
 from app.orders.models import Order, OrderFile, OrderStatus
 from app.orders.schemas import OrderFileCreate, OrderStatusUpdate
 from app.payments.models import Payment, PaymentStatus
+from app.requirements.models import RequirementStatus
 from app.users.models import User
 
 
@@ -57,7 +58,7 @@ async def update_status(db: AsyncSession, user: User, order_id: UUID, payload: O
     allowed_transitions = {
         OrderStatus.PENDING: {OrderStatus.ACTIVE, OrderStatus.CANCELLED},
         OrderStatus.ACTIVE: {OrderStatus.DELIVERED, OrderStatus.CANCELLED, OrderStatus.DISPUTED},
-        OrderStatus.DELIVERED: {OrderStatus.COMPLETED, OrderStatus.DISPUTED},
+        OrderStatus.DELIVERED: {OrderStatus.DISPUTED},
         OrderStatus.DISPUTED: {OrderStatus.ACTIVE, OrderStatus.CANCELLED},
         OrderStatus.COMPLETED: set(),
         OrderStatus.CANCELLED: set(),
@@ -81,6 +82,12 @@ async def update_status(db: AsyncSession, user: User, order_id: UUID, payload: O
         order.started_at = datetime.now(UTC)
     if payload.status == OrderStatus.COMPLETED:
         order.completed_at = datetime.now(UTC)
+        if order.requirement:
+            order.requirement.status = RequirementStatus.COMPLETED
+    elif payload.status == OrderStatus.CANCELLED and order.requirement:
+        order.requirement.status = RequirementStatus.CANCELLED
+    elif payload.status in {OrderStatus.ACTIVE, OrderStatus.DELIVERED, OrderStatus.DISPUTED} and order.requirement:
+        order.requirement.status = RequirementStatus.IN_PROGRESS
     queue_notification(
         db,
         order.customer_id,
@@ -88,6 +95,38 @@ async def update_status(db: AsyncSession, user: User, order_id: UUID, payload: O
         f"{user.full_name} changed your order status to {payload.status.value}.",
         f"/orders/{order.id}",
     )
+    await db.commit()
+    return await _get_authorized_order(db, user, order_id)
+
+
+async def confirm_completion(db: AsyncSession, user: User, order_id: UUID) -> Order:
+    order = await _get_authorized_order(db, user, order_id)
+    if order.status != OrderStatus.DELIVERED:
+        raise APIError("Completion can be confirmed only after the creator marks the project delivered")
+    if user.id == order.customer_id:
+        order.customer_completed_at = order.customer_completed_at or datetime.now(UTC)
+        recipient_id = order.creator_id
+        title = "Customer confirmed completion"
+        body = "The customer confirmed the delivered project. Creator confirmation is also required before payout is ready."
+    elif user.id == order.creator_id:
+        order.creator_completed_at = order.creator_completed_at or datetime.now(UTC)
+        recipient_id = order.customer_id
+        title = "Creator confirmed completion"
+        body = "The creator confirmed completion. Customer confirmation is also required before payout is ready."
+    else:
+        raise ForbiddenError("Only the customer or creator can confirm completion")
+
+    if order.customer_completed_at and order.creator_completed_at:
+        now = datetime.now(UTC)
+        order.status = OrderStatus.COMPLETED
+        order.completed_at = order.completed_at or now
+        order.payout_ready_at = order.payout_ready_at or now
+        if order.requirement:
+            order.requirement.status = RequirementStatus.COMPLETED
+        title = "Project completed"
+        body = "Both customer and creator confirmed completion. The creator payout is now ready after platform commission deduction."
+
+    queue_notification(db, recipient_id, title, body, f"/orders/{order.id}")
     await db.commit()
     return await _get_authorized_order(db, user, order_id)
 

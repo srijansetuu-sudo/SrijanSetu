@@ -74,12 +74,15 @@ function isImageAttachment(message) {
 }
 
 function PersonSummary({ label, person, linkProfile = false }) {
+  const address = [person?.address_line, person?.city, person?.state, person?.postal_code].filter(Boolean).join(", ");
   const content = (
-    <span className="inline-flex min-w-0 items-center gap-2">
+    <span className="inline-flex min-w-0 items-start gap-2">
       {person?.avatar_url ? <img src={person.avatar_url} alt="" className="h-8 w-8 rounded-full object-cover" /> : <UserCircle className="h-7 w-7 shrink-0 text-muted-foreground" />}
       <span className="min-w-0">
         <span className="block text-xs font-semibold uppercase text-muted-foreground">{label}</span>
         <span className="block truncate font-bold text-primary">{personName(person, label)}</span>
+        {person?.phone_number ? <span className="mt-1 block text-sm text-muted-foreground">{person.phone_number}</span> : null}
+        {address ? <span className="mt-1 block text-sm text-muted-foreground">{address}</span> : null}
       </span>
     </span>
   );
@@ -129,6 +132,7 @@ export function OrderWorkspacePage() {
   const messages = useApiQuery(queryKeys.messages(id), () => messageService.byOrder(id), { enabled: Boolean(id) && !isPendingActivation });
   const sendMessage = useApiMutation((payload) => messageService.create({ ...payload, order_id: id }), { invalidate: queryKeys.messages(id) });
   const updateStatus = useApiMutation((status) => orderService.updateStatus(id, status), { successMessage: "Status updated", invalidate: queryKeys.order(id) });
+  const confirmCompletion = useApiMutation(() => orderService.confirmCompletion(id), { successMessage: "Completion confirmed", invalidate: [queryKeys.order(id), queryKeys.orders, queryKeys.myRequirements, queryKeys.payments] });
   const createPayment = useApiMutation(paymentService.create, { successMessage: "Payment started" });
   const verifyPayment = useApiMutation(({ paymentId, payload }) => paymentService.verify(paymentId, payload), { successMessage: "Payment successful", invalidate: [queryKeys.order(id), queryKeys.payments] });
   const review = useApiMutation((payload) => reviewService.create({ ...payload, order_id: id, creator_id: order.data?.creator_id }), { successMessage: "Review submitted" });
@@ -240,27 +244,16 @@ export function OrderWorkspacePage() {
   const currentOrder = order.data ?? {};
   const creatorName = personName(currentOrder.creator, "Creator");
   const upfrontAmount = Number(currentOrder.total_amount ?? 0);
+  const isDelivered = currentOrder.status === "DELIVERED";
+  const isCompleted = currentOrder.status === "COMPLETED";
+  const isCustomer = user?.id === currentOrder.customer_id;
+  const isCreator = user?.id === currentOrder.creator_id;
+  const hasConfirmedCompletion = isCustomer ? Boolean(currentOrder.customer_completed_at) : isCreator ? Boolean(currentOrder.creator_completed_at) : false;
 
   const startRazorpayPayment = async ({ amount, paymentMethod, description }) => {
-    const isLocalBypass = process.env.NODE_ENV !== "production";
     const razorpayKey = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
-    if (!razorpayKey && !isLocalBypass) {
+    if (!razorpayKey) {
       showFormValidationToast({ payment: { message: "Razorpay public key is not configured" } });
-      return;
-    }
-    if (isLocalBypass) {
-      createPayment.mutate({ order_id: id, amount, payment_method: paymentMethod }, {
-        onSuccess: (payment) => {
-          verifyPayment.mutate({
-            paymentId: payment.id,
-            payload: {
-              razorpay_payment_id: `local_test_${payment.id}`,
-              razorpay_order_id: payment.razorpay_order_id,
-              status: "SUCCESS",
-            },
-          });
-        },
-      });
       return;
     }
     const loaded = await loadRazorpayCheckout();
@@ -332,7 +325,16 @@ export function OrderWorkspacePage() {
                   <PersonSummary label="Creator" person={currentOrder.creator} linkProfile />
                 </div>
                 <div className="mt-6 grid gap-2 sm:grid-cols-3">
-                  {!isPendingActivation ? <RoleGuard roles={["CREATOR"]}>{["ACTIVE", "DELIVERED", "COMPLETED"].map((status) => <Button key={status} size="sm" variant="outline" onClick={() => updateStatus.mutate(status)}>{status}</Button>)}</RoleGuard> : null}
+                  {!isPendingActivation ? <RoleGuard roles={["CREATOR"]}>
+                    {currentOrder.status === "ACTIVE" ? <Button size="sm" variant="outline" onClick={() => updateStatus.mutate("DELIVERED")}>Mark delivered</Button> : null}
+                    {currentOrder.status === "DISPUTED" ? <Button size="sm" variant="outline" onClick={() => updateStatus.mutate("ACTIVE")}>Resume work</Button> : null}
+                    {["ACTIVE", "DELIVERED"].includes(currentOrder.status) ? <Button size="sm" variant="outline" onClick={() => updateStatus.mutate("DISPUTED")}>Raise dispute</Button> : null}
+                  </RoleGuard> : null}
+                  {!isPendingActivation && isDelivered && (isCustomer || isCreator) ? (
+                    <Button size="sm" variant="accent" disabled={confirmCompletion.isPending || hasConfirmedCompletion} onClick={() => confirmCompletion.mutate()}>
+                      {hasConfirmedCompletion ? "Completion confirmed" : "Confirm completion"}
+                    </Button>
+                  ) : null}
                   <RoleGuard roles={["CUSTOMER"]}>
                     {isPendingActivation ? <div className="rounded-lg border border-border bg-muted/60 p-4 sm:col-span-3">
                       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -345,6 +347,16 @@ export function OrderWorkspacePage() {
                     </div> : null}
                   </RoleGuard>
                 </div>
+                {!isPendingActivation ? (
+                  <div className="mt-6 rounded-lg border border-border bg-muted/60 p-4 text-sm text-muted-foreground">
+                    <p className="font-semibold text-primary">Delivery and payout</p>
+                    <p className="mt-1">SrijanSetu currently does not support delivery logistics. Customer and creator must coordinate delivery directly; delivery support is planned for a future release.</p>
+                    <p className="mt-1">The customer payment stays with SrijanSetu while work is in progress. After the creator marks the project delivered and both customer and creator confirm completion, creator payout becomes ready after platform commission deduction.</p>
+                    <p className="mt-1 font-semibold text-primary">Creator payout after commission: {money(currentOrder.creator_payout_amount)}</p>
+                    {isDelivered ? <p className="mt-1 font-semibold text-primary">Customer confirmation: {currentOrder.customer_completed_at ? "done" : "pending"} · Creator confirmation: {currentOrder.creator_completed_at ? "done" : "pending"}</p> : null}
+                    {isCompleted ? <p className="mt-1 font-semibold text-primary">Project completed. Creator payout is ready after commission deduction.</p> : null}
+                  </div>
+                ) : null}
               </CardContent>
             </Card>
           )}
@@ -388,7 +400,7 @@ export function OrderWorkspacePage() {
             </CardContent>
           </Card> : null}
 
-          {!isPendingActivation ? <RoleGuard roles={["CUSTOMER"]}>
+          {isCompleted ? <RoleGuard roles={["CUSTOMER"]}>
             <Card>
               <CardContent>
                 <h2 className="text-xl font-bold text-primary">Review Creator</h2>
