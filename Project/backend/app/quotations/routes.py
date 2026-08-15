@@ -45,7 +45,7 @@ async def my_quotations(db: AsyncSession = Depends(get_db), user: User = Depends
 @router.post("/quotations/{quotation_id}/accept", response_model=APIResponse)
 async def accept_quotation(quotation_id: UUID, db: AsyncSession = Depends(get_db), user: User = Depends(require_customer)):
     order = await service.accept_quotation(db, user, quotation_id)
-    return APIResponse(message="Quotation accepted", data={"order": OrderRead.model_validate(order).model_dump(mode="json")})
+    return APIResponse(message="Payment checkout ready", data={"order": OrderRead.model_validate(order).model_dump(mode="json")})
 
 
 @router.post("/quotations/{quotation_id}/reject", response_model=APIResponse)

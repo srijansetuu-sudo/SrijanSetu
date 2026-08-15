@@ -15,9 +15,9 @@ export const useAuthStore = create((set, get) => ({
   ...initialUser,
   hydrate: () => {
     if (typeof window === "undefined") return;
-    const accessToken = localStorage.getItem("srijansetu_access_token");
-    const refreshToken = localStorage.getItem("srijansetu_refresh_token");
-    const rawUser = localStorage.getItem("srijansetu_user");
+    const accessToken = sessionStorage.getItem("srijansetu_access_token");
+    const refreshToken = sessionStorage.getItem("srijansetu_refresh_token");
+    const rawUser = sessionStorage.getItem("srijansetu_user");
     const user = rawUser ? JSON.parse(rawUser) : null;
     set({
       user,
@@ -30,9 +30,9 @@ export const useAuthStore = create((set, get) => ({
   },
   setSession: ({ user, accessToken, refreshToken }) => {
     if (typeof window !== "undefined") {
-      if (accessToken) localStorage.setItem("srijansetu_access_token", accessToken);
-      if (refreshToken) localStorage.setItem("srijansetu_refresh_token", refreshToken);
-      if (user) localStorage.setItem("srijansetu_user", JSON.stringify(user));
+      if (accessToken) sessionStorage.setItem("srijansetu_access_token", accessToken);
+      if (refreshToken) sessionStorage.setItem("srijansetu_refresh_token", refreshToken);
+      if (user) sessionStorage.setItem("srijansetu_user", JSON.stringify(user));
     }
     set({
       user: user ?? get().user,
@@ -45,9 +45,9 @@ export const useAuthStore = create((set, get) => ({
   },
   clearSession: () => {
     if (typeof window !== "undefined") {
-      localStorage.removeItem("srijansetu_access_token");
-      localStorage.removeItem("srijansetu_refresh_token");
-      localStorage.removeItem("srijansetu_user");
+      sessionStorage.removeItem("srijansetu_access_token");
+      sessionStorage.removeItem("srijansetu_refresh_token");
+      sessionStorage.removeItem("srijansetu_user");
     }
     set({ ...initialUser, hydrated: true });
   },

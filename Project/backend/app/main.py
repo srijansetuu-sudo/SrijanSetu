@@ -59,13 +59,14 @@ async def security_middleware(request: Request, call_next):
 
 @app.on_event("startup")
 async def seed_default_admin_user() -> None:
-    if settings.environment.lower() not in {"local", "development", "test"} and settings.jwt_secret_key == "change-me":
-        raise RuntimeError("JWT secret must be changed before running outside local development")
-    try:
-        async with AsyncSessionLocal() as db:
-            await ensure_default_admin_user(db)
-    except Exception:
-        pass
+    if settings.environment.lower() not in {"local", "development", "test"}:
+        if not settings.environment_explicit:
+            raise RuntimeError("ENVIRONMENT must be explicitly set in production")
+        if settings.jwt_secret_key == "change-me":
+            raise RuntimeError("JWT secret must be changed before running outside local development")
+
+    async with AsyncSessionLocal() as db:
+        await ensure_default_admin_user(db)
 
 
 def custom_openapi():

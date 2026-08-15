@@ -67,6 +67,12 @@ async def ensure_default_admin_user(db: AsyncSession) -> User | None:
     if existing_admin:
         return existing_admin
 
+    if settings.environment.lower() not in {"local", "development", "test"} or not settings.environment_explicit:
+        raise RuntimeError(
+            "Default admin bootstrapping is allowed only in explicit local, development, or test environments. "
+            "Create the first admin user manually in production."
+        )
+
     admin_user = User(
         full_name="System Administrator",
         email=DEFAULT_ADMIN_EMAIL,

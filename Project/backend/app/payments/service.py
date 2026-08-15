@@ -14,6 +14,8 @@ from app.notifications.service import queue_notification
 from app.orders.models import Order, OrderStatus
 from app.payments.models import Payment, PaymentStatus
 from app.payments.schemas import PaymentCreate, PaymentVerify
+from app.quotations.models import Quotation, QuotationStatus
+from app.requirements.models import Requirement, RequirementStatus
 from app.users.models import User
 
 def _money(value: Decimal) -> Decimal:
@@ -104,13 +106,6 @@ async def create_payment(db: AsyncSession, user: User, payload: PaymentCreate) -
 
     payment = Payment(**payload.model_dump(), razorpay_order_id=_create_gateway_order(order, payload))
     db.add(payment)
-    queue_notification(
-        db,
-        order.creator_id,
-        "Payment created",
-        f"{user.full_name} created a payment for order {order.id}.",
-        f"/orders/{order.id}",
-    )
     await db.commit()
     await db.refresh(payment)
     return payment
@@ -133,7 +128,6 @@ async def verify_payment(db: AsyncSession, user: User, payment_id: UUID, payload
         return payment
     if payload.status not in allowed_transitions[payment.payment_status]:
         raise APIError(f"Cannot change payment status from {payment.payment_status.value} to {payload.status.value}")
-    old_status = payment.payment_status
     if payload.status == PaymentStatus.SUCCESS:
         if not payload.razorpay_payment_id:
             raise APIError("Razorpay payment id is required")
@@ -150,13 +144,19 @@ async def verify_payment(db: AsyncSession, user: User, payment_id: UUID, payload
     if payload.status == PaymentStatus.SUCCESS and _money(payment.amount) == _money(order.total_amount) and order.status == OrderStatus.PENDING:
         order.status = OrderStatus.ACTIVE
         order.started_at = datetime.now(UTC)
-    queue_notification(
-        db,
-        order.creator_id,
-        "Payment status updated",
-        f"Payment for order {order.id} changed from {old_status.value} to {payload.status.value}.",
-        f"/orders/{order.id}",
-    )
+        quotation = await db.get(Quotation, order.quotation_id)
+        requirement = await db.get(Requirement, order.requirement_id)
+        if quotation:
+            quotation.status = QuotationStatus.ACCEPTED
+        if requirement:
+            requirement.status = RequirementStatus.IN_PROGRESS
+        queue_notification(
+            db,
+            order.creator_id,
+            "Quotation accepted",
+            f"{user.full_name} completed payment for your quotation. The workspace is now active.",
+            f"/orders/{order.id}",
+        )
     await db.commit()
     await db.refresh(payment)
     return payment

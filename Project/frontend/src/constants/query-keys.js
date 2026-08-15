@@ -21,4 +21,7 @@ export const queryKeys = {
   adminUsers: ["admin", "users"],
   adminRequirements: ["admin", "requirements"],
   adminQuotations: ["admin", "quotations"],
+  adminPayouts: ["admin", "payouts"],
+  adminPayout: (id) => ["admin", "payout", id],
+  adminOrderPayout: (orderId) => ["admin", "order", "payout", orderId],
 };

@@ -57,6 +57,11 @@ export const adminService = {
   deleteRequirement: (id) => data(api.delete(`/admin/requirements/${id}`)),
   quotations: () => data(api.get("/admin/quotations")),
   deleteQuotation: (id) => data(api.delete(`/admin/quotations/${id}`)),
+  payouts: (params) => data(api.get("/admin/payouts", { params })),
+  orderPayout: (orderId) => pick(api.get(`/admin/orders/${orderId}/payout`), "payout"),
+  createOrderPayout: (orderId, payload) => pick(api.post(`/admin/orders/${orderId}/payouts`, body(payload)), "payout"),
+  getPayout: (id) => pick(api.get(`/admin/payouts/${id}`), "payout"),
+  updatePayout: (id, payload) => pick(api.patch(`/admin/payouts/${id}`, body(payload)), "payout"),
 };
 
 export const orderService = {

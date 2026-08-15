@@ -418,14 +418,14 @@ export function RequirementQuotationsPage() {
   const user = useAuthStore((state) => state.user);
   const query = useApiQuery(queryKeys.quotations(id), () => requirementService.quotations(id), { enabled: Boolean(id) });
   const accept = useApiMutation(quotationService.accept, {
-    successMessage: "Quotation accepted",
+    successMessage: "Payment checkout ready",
     invalidate: queryKeys.quotations(id),
   });
   const createPayment = useApiMutation(paymentService.create, { successMessage: "Payment started" });
-  const verifyPayment = useApiMutation(({ paymentId, payload }) => paymentService.verify(paymentId, payload), { successMessage: "Payment successful", invalidate: [queryKeys.quotations(id), queryKeys.payments] });
+  const verifyPayment = useApiMutation(({ paymentId, payload }) => paymentService.verify(paymentId, payload), { successMessage: "Payment successful", invalidate: [queryKeys.quotations(id), queryKeys.myRequirements, queryKeys.payments] });
   const reject = useApiMutation(quotationService.reject, { successMessage: "Quotation rejected", invalidate: queryKeys.quotations(id) });
   const quotations = asArray(query.data);
-  const hasActiveAcceptedQuotation = quotations.some((quotation) => quotation.status === "ACCEPTED" && quotation.order_status !== "PENDING");
+  const hasLockedQuotation = quotations.some((quotation) => quotation.order_id);
 
   const openUpfrontCheckout = async (order, quotation) => {
     const razorpayKey = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
@@ -491,7 +491,7 @@ export function RequirementQuotationsPage() {
   };
 
   return <ProtectedRoute roles={["CUSTOMER"]}><DashboardShell><h1 className="text-3xl font-bold text-primary">Quotations Received</h1><div className="mt-6 grid gap-4">{query.isLoading ? <LoadingState /> : quotations.length ? quotations.map((quotation) => {
-    const canPayDeposit = !hasActiveAcceptedQuotation && (quotation.status === "PENDING" || (quotation.status === "ACCEPTED" && quotation.order_status === "PENDING"));
-    return <QuotationCard key={quotation.id} quotation={quotation} onAccept={canPayDeposit ? () => acceptAndPay(quotation) : undefined} onReject={!hasActiveAcceptedQuotation && quotation.status === "PENDING" ? () => reject.mutate(quotation.id) : undefined} />;
+    const canPayDeposit = quotation.order_status === "PENDING" || (!hasLockedQuotation && quotation.status === "PENDING");
+    return <QuotationCard key={quotation.id} quotation={quotation} onAccept={canPayDeposit ? () => acceptAndPay(quotation) : undefined} onReject={!hasLockedQuotation && quotation.status === "PENDING" ? () => reject.mutate(quotation.id) : undefined} />;
   }) : <EmptyState title="No quotations yet" />}</div></DashboardShell></ProtectedRoute>;
 }

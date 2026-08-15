@@ -57,7 +57,7 @@ export function RequirementCard({ requirement, href, actionLabel = "View require
 }
 
 export function QuotationCard({ quotation, onAccept, onReject, onDelete }) {
-  const statusLabel = quotation.status === "ACCEPTED" && quotation.order_status === "PENDING" ? "PAYMENT PENDING" : quotation.status;
+  const statusLabel = quotation.order_status === "PENDING" ? "PAYMENT PENDING" : quotation.status;
   return (
     <Card>
       <CardContent>

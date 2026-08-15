@@ -33,6 +33,7 @@ const creatorLinks = [
 const adminLinks = [
   { href: "/dashboard/admin", label: "Overview", icon: Home },
   { href: "/dashboard/admin/users", label: "Users", icon: Users },
+  { href: "/dashboard/admin/payouts", label: "Payouts", icon: CreditCard },
   { href: "/dashboard/admin/requirements", label: "Requirements", icon: FileText },
   { href: "/dashboard/admin/quotations", label: "Quotations", icon: MessageSquare },
   { href: "/workspaces", label: "Workspaces", icon: MessageSquare },

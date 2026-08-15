@@ -74,8 +74,10 @@ async def accept_quotation(db: AsyncSession, user: User, quotation_id: UUID) -> 
     if requirement.customer_id != user.id:
         raise ForbiddenError("Only the requirement owner can accept quotations")
     existing_order = await db.scalar(select(Order).where(Order.requirement_id == requirement.id))
-    if quotation.status == QuotationStatus.ACCEPTED and existing_order and existing_order.status == OrderStatus.PENDING:
+    if existing_order and existing_order.status == OrderStatus.PENDING and existing_order.quotation_id == quotation.id:
         return existing_order
+    if existing_order and existing_order.status == OrderStatus.PENDING:
+        raise APIError("Payment is already in progress for another quotation on this requirement")
     if requirement.status != RequirementStatus.OPEN:
         raise APIError("Only open requirements can accept quotations")
     if quotation.status != QuotationStatus.PENDING:
@@ -83,8 +85,6 @@ async def accept_quotation(db: AsyncSession, user: User, quotation_id: UUID) -> 
     if existing_order:
         raise APIError("This requirement already has an order")
 
-    quotation.status = QuotationStatus.ACCEPTED
-    requirement.status = RequirementStatus.IN_PROGRESS
     amount = Decimal(str(quotation.proposed_price))
     order = Order(
         requirement_id=requirement.id,
@@ -96,13 +96,6 @@ async def accept_quotation(db: AsyncSession, user: User, quotation_id: UUID) -> 
     )
     db.add(order)
     await db.flush()
-    queue_notification(
-        db,
-        quotation.creator_id,
-        "Quotation accepted",
-        f"Your quotation for '{requirement.title}' was accepted. Open the workspace to chat with the customer.",
-        f"/orders/{order.id}",
-    )
     await db.commit()
     await db.refresh(order)
     return order

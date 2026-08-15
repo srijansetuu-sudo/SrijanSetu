@@ -1,5 +1,7 @@
+import os
 from pathlib import Path
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -9,7 +11,8 @@ BACKEND_ROOT = PROJECT_ROOT / "backend"
 
 class Settings(BaseSettings):
     app_name: str = "SrijanSetu API"
-    environment: str = "local"
+    environment: str = Field(default="local", env="ENVIRONMENT")
+    environment_explicit: bool = Field(default_factory=lambda: os.getenv("ENVIRONMENT") is not None)
     database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/srijansetu"
     jwt_secret_key: str = "change-me"
     jwt_secret: str | None = None
