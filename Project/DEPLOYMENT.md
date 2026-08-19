@@ -77,7 +77,7 @@ NEXT_PUBLIC_API_URL=https://your-domain.example/api/v1
 POSTGRES_DB=srijansetu
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=strong-postgres-password
-# docker-compose.production.yml builds DATABASE_URL from the values above.
+DATABASE_URL=postgresql+psycopg://postgres:strong-postgres-password@postgres:5432/srijansetu
 
 JWT_SECRET_KEY=replace-with-a-long-random-secret
 JWT_ALGORITHM=HS256
@@ -140,6 +140,16 @@ If you need to run the same command from the host without entering the container
 ```bash
 docker compose -f docker-compose.production.yml run --rm backend alembic upgrade head
 ```
+
+## Create the first production admin
+
+The application intentionally does not bootstrap an admin user in production. After the database migrations finish, run the one-time admin creation script. It prompts for the email and password without storing the password in source control:
+
+```bash
+docker compose -f docker-compose.production.yml run --rm --no-deps --entrypoint python backend scripts/create_first_admin.py
+```
+
+If an admin already exists, the script makes no changes. For non-interactive use, provide `ADMIN_EMAIL` and `ADMIN_PASSWORD` through the command environment; do not commit them to `.env` or source control.
 
 ## Logs
 
