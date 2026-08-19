@@ -77,7 +77,7 @@ NEXT_PUBLIC_API_URL=https://your-domain.example/api/v1
 POSTGRES_DB=srijansetu
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=strong-postgres-password
-DATABASE_URL=postgresql+psycopg://postgres:strong-postgres-password@postgres:5432/srijansetu
+# docker-compose.production.yml builds DATABASE_URL from the values above.
 
 JWT_SECRET_KEY=replace-with-a-long-random-secret
 JWT_ALGORITHM=HS256
