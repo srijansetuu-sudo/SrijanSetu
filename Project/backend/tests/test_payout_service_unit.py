@@ -10,7 +10,6 @@ from app.payouts import schemas
 from app.core.exceptions import NotFoundError, APIError
 from app.orders.models import OrderStatus
 
-
 @pytest.mark.asyncio
 async def test_money_quantization():
     assert service._money(Decimal("1")) == Decimal("1.00")
