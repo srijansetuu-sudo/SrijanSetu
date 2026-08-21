@@ -106,10 +106,10 @@ export function LoginPage() {
       subtitle="Open your dashboard to manage work, quotes, payments, and delivery."
       footer={<p className="mt-5 text-sm text-muted-foreground">New here? <Link className="font-semibold text-primary hover:text-[#1d4ed8]" href="/signup">Create an account</Link></p>}
     >
-      <form className="grid gap-4" onSubmit={handleSubmit((values) => login.mutate(values), showFormValidationToast)}>
+      <form className="grid gap-4" noValidate onSubmit={handleSubmit((values) => login.mutate(values), showFormValidationToast)}>
         <Field label="Email" error={errors.email} icon={Mail}><Input type="email" placeholder="you@example.com" {...register("email")} /></Field>
         <Field label="Password" error={errors.password} icon={LockKeyhole}><Input type="password" placeholder="Minimum 6 characters" {...register("password")} /></Field>
-        <Button className="mt-2 w-full text-white" disabled={login.isPending}>
+        <Button type="submit" className="mt-2 w-full text-white" disabled={login.isPending}>
           {login.isPending ? "Signing in..." : "Login"}
           {!login.isPending ? <ArrowRight className="h-4 w-4" /> : null}
         </Button>

@@ -51,7 +51,7 @@ export function useApiMutation(fn, options = {}) {
       await options.onSuccess?.(data, variables, context);
     },
     onError: (error) => {
-      if (options.showErrorToast !== false) toast.error(getApiErrorMessage(error));
+      if (options.showErrorToast !== false) toast.error(getApiErrorMessage(error), { duration: options.errorToastDuration ?? 4000 });
       options.onError?.(error);
     },
   });

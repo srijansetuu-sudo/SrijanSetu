@@ -34,6 +34,7 @@ export function useLogin() {
       toast.success("Welcome back");
       router.push("/profile?setup=1");
     },
+    errorToastDuration: 8000,
   });
 }
 
@@ -51,6 +52,7 @@ export function useSignup() {
       toast.success("Account created");
       router.push("/profile?setup=1");
     },
+    errorToastDuration: 8000,
   });
 }
 
