@@ -71,7 +71,7 @@ Minimum production values:
 ```env
 APP_NAME=SrijanSetu API
 ENVIRONMENT=production
-FRONTEND_ORIGIN=https://your-domain.example
+FRONTEND_ORIGIN=https://your-domain.example,https://www.your-domain.example
 NEXT_PUBLIC_API_URL=https://your-domain.example/api/v1
 
 POSTGRES_DB=srijansetu
