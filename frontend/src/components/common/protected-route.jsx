@@ -1,12 +1,13 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useApiQuery } from "@/hooks/use-api";
 import { creatorService } from "@/services/api-services";
 import { queryKeys } from "@/constants/query-keys";
 import { useAuthStore } from "@/store/auth-store";
 import { LoadingState } from "@/components/common/states";
+import { toast } from "sonner";
 
 function hasValue(value) {
   if (Array.isArray(value)) return value.length > 0;
@@ -41,6 +42,7 @@ export function ProtectedRoute({ roles, children, requireProfile = true }) {
   const router = useRouter();
   const pathname = usePathname();
   const { hydrated, isAuthenticated, role, user } = useAuthStore();
+  const profileToastShown = useRef(false);
   const profileRoute = isProfileRoute(pathname);
   const shouldCheckProfile = requireProfile && hydrated && isAuthenticated && !profileRoute;
   const shouldCheckCreatorProfile = shouldCheckProfile && role === "CREATOR";
@@ -65,7 +67,13 @@ export function ProtectedRoute({ roles, children, requireProfile = true }) {
       return;
     }
     if (profileIncomplete) {
+      if (!profileToastShown.current) {
+        toast.error("Complete the required details in your profile to continue", { duration: 7000 });
+        profileToastShown.current = true;
+      }
       router.replace("/profile?setup=1");
+    } else {
+      profileToastShown.current = false;
     }
   }, [hydrated, isAuthenticated, profileIncomplete, roleBlocked, router]);
 
