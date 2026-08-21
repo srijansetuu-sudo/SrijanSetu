@@ -1,10 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Camera, ExternalLink, UserCircle } from "lucide-react";
+import { Camera, UserCircle } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -151,7 +150,6 @@ export function ProfilePage() {
             <p className="text-sm font-semibold uppercase text-muted-foreground">Profile overview</p>
             <h1 className="mt-1 text-3xl font-bold text-primary">{isCreator ? "Creator Profile" : "Customer Profile"}</h1>
           </div>
-          <Button asChild variant="outline"><Link href={profilePath(role)}>Skip for now</Link></Button>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
@@ -234,7 +232,7 @@ export function ProfilePage() {
 
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <Button type="submit" disabled={saveProfile.isPending}>Save profile</Button>
-                  <Link href={profilePath(role)} className="inline-flex items-center gap-2 text-sm font-semibold text-primary">Go to dashboard <ExternalLink className="h-4 w-4" /></Link>
+                  <p className="text-sm font-semibold text-muted-foreground">Complete the required fields to continue.</p>
                 </div>
               </form>
             </CardContent>
