@@ -12,7 +12,16 @@ import { useApiQuery } from "@/hooks/use-api";
 import { asArray } from "@/lib/utils";
 import { notificationService } from "@/services/api-services";
 
-export function Navbar() {
+function mergeLinks(groups) {
+  const seen = new Set();
+  return groups.flat().filter((link) => {
+    if (seen.has(link.href)) return false;
+    seen.add(link.href);
+    return true;
+  });
+}
+
+export function Navbar({ mobileLinks = [], forceMenu = false }) {
   const [open, setOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const { isAuthenticated, role, user } = useAuthStore();
@@ -34,6 +43,15 @@ export function Navbar() {
           { href: "/contact", label: "Contact" },
         ]
       : [{ href: "/contact", label: "Contact" }];
+  const accountLinks = isAuthenticated
+    ? [
+        { href: "/profile", label: "Profile overview" },
+        { href: dashboard, label: "Dashboard" },
+        { href: "/workspaces", label: "Workspaces" },
+        { href: "/notifications", label: "Notifications", notifications: unreadNotifications },
+      ]
+    : [{ href: "/login", label: "Login" }];
+  const menuLinks = mergeLinks([links, mobileLinks, accountLinks]);
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-white/95 backdrop-blur">
@@ -45,10 +63,10 @@ export function Navbar() {
             <p className="text-xs uppercase tracking-wide text-muted-foreground">Discover Handmade Art</p>
           </div>
         </Link>
-        <nav className="hidden items-center gap-6 md:flex">
+        <nav className={`${forceMenu ? "hidden" : "hidden items-center gap-6 md:flex"}`}>
           {links.map((link) => <Link key={link.href} href={link.href} className="text-sm font-semibold text-muted-foreground hover:text-primary">{link.label}</Link>)}
         </nav>
-        <div className="hidden items-center gap-2 md:flex">
+        <div className={`${forceMenu ? "hidden" : "hidden items-center gap-2 md:flex"}`}>
           {isAuthenticated ? (
             <div className="relative">
               <button className="inline-flex h-11 items-center gap-2 rounded-lg border border-border bg-white px-3 text-sm font-semibold text-primary shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md focus:outline-none focus:ring-4 focus:ring-primary/15 active:translate-y-0" onClick={() => setProfileOpen(!profileOpen)} aria-expanded={profileOpen}>
@@ -80,12 +98,12 @@ export function Navbar() {
             </>
           )}
         </div>
-        <button className="md:hidden" onClick={() => setOpen(!open)}><Menu className="h-6 w-6" /></button>
+        <button className={forceMenu ? "" : "md:hidden"} onClick={() => setOpen(!open)} aria-expanded={open} aria-label="Toggle navigation menu"><Menu className="h-6 w-6" /></button>
       </div>
-      {open ? (
-        <div className="border-t border-border bg-white p-4 md:hidden">
-          <div className="grid gap-3">
-            {[...links, ...(isAuthenticated ? [{ href: "/profile", label: "Profile overview" }, { href: dashboard, label: "Dashboard" }, { href: "/workspaces", label: "Workspaces" }, { href: "/notifications", label: "Notifications", notifications: unreadNotifications }] : [{ href: "/login", label: "Login" }])].map((link) => (
+      <div className={`absolute left-0 right-0 top-16 grid overflow-hidden border-t border-border bg-white shadow-xl transition-all duration-300 ease-out ${forceMenu ? "" : "md:hidden"} ${open ? "grid-rows-[1fr] opacity-100" : "pointer-events-none grid-rows-[0fr] opacity-0"}`}>
+        <div className={`min-h-0 transition-transform duration-300 ease-out ${open ? "translate-y-0" : "-translate-y-3"}`}>
+          <div className="grid gap-3 p-4">
+            {menuLinks.map((link) => (
               <Link key={link.href} href={link.href} onClick={() => setOpen(false)} className="flex items-center justify-between font-semibold text-primary">
                 <span>{link.label}</span>
                 {link.notifications > 0 ? <span className="grid h-5 min-w-5 place-items-center rounded-full bg-accent px-1.5 text-xs font-bold text-primary">{link.notifications}</span> : null}
@@ -94,7 +112,7 @@ export function Navbar() {
             {isAuthenticated ? <button className="text-left font-semibold text-primary" onClick={() => { setOpen(false); logout.mutate(); }}>Logout</button> : null}
           </div>
         </div>
-      ) : null}
+      </div>
     </header>
   );
 }

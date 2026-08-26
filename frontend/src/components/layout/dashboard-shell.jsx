@@ -1,10 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Bell, Briefcase, CreditCard, FileText, Headphones, Home, Menu, MessageSquare, Star, User, Users, X } from "lucide-react";
-import { cn, asArray } from "@/lib/utils";
+import { Bell, Briefcase, CreditCard, FileText, Headphones, Home, MessageSquare, Star, User, Users } from "lucide-react";
+import { asArray } from "@/lib/utils";
 import { Navbar } from "@/components/layout/navbar";
 import { useApiQuery } from "@/hooks/use-api";
 import { queryKeys } from "@/constants/query-keys";
@@ -43,66 +40,20 @@ const adminLinks = [
 ];
 
 export function DashboardShell({ role = "CUSTOMER", children }) {
-  const pathname = usePathname();
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const links = role === "CREATOR" ? creatorLinks : role === "ADMIN" ? adminLinks : customerLinks;
   const notifications = useApiQuery(queryKeys.notifications, notificationService.list, { refetchOnMount: "always" });
   const unreadNotifications = asArray(notifications.data).filter((item) => !item.is_read).length;
+  const mobileLinks = links.map((item) => ({
+    href: item.href,
+    label: item.label,
+    notifications: item.href === "/notifications" ? unreadNotifications : undefined,
+  }));
+
   return (
     <>
-      <Navbar />
-      <div className="px-4 py-8 md:ml-[240px] md:px-6 lg:px-8">
-        <button
-          type="button"
-          className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-white px-3 text-sm font-semibold text-primary shadow-sm transition-colors hover:bg-muted focus:outline-none focus:ring-4 focus:ring-primary/15 md:hidden"
-          onClick={() => setMobileSidebarOpen(true)}
-          aria-controls="dashboard-sidebar"
-          aria-expanded={mobileSidebarOpen}
-        >
-          <Menu className="h-4 w-4" />
-          Menu
-        </button>
-        <button
-          type="button"
-          className={cn("fixed inset-x-0 bottom-0 top-16 z-40 bg-primary/25 transition-opacity md:hidden", mobileSidebarOpen ? "opacity-100" : "pointer-events-none opacity-0")}
-          onClick={() => setMobileSidebarOpen(false)}
-          aria-label="Close dashboard menu"
-        />
-        <aside
-          id="dashboard-sidebar"
-          className={cn(
-            "surface dashboard-sidebar fixed bottom-0 left-0 top-16 z-50 w-[280px] max-w-[85vw] overflow-y-auto rounded-none border-y-0 border-l-0 p-3 shadow-2xl transition-transform duration-200 ease-out md:fixed md:bottom-0 md:left-0 md:top-16 md:z-20 md:h-[calc(100vh-4rem)] md:w-[240px] md:translate-x-0 md:overflow-y-auto md:shadow-none",
-            mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
-          )}
-        >
-          <div className="mb-2 flex items-center justify-between md:hidden">
-            <span className="text-sm font-bold text-primary">Dashboard menu</span>
-            <button
-              type="button"
-              className="grid h-9 w-9 place-items-center rounded-lg text-primary transition-colors hover:bg-muted focus:outline-none focus:ring-4 focus:ring-primary/15"
-              onClick={() => setMobileSidebarOpen(false)}
-              aria-label="Close dashboard menu"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-          <nav className="flex h-full flex-col gap-1">
-            {links.map((item) => {
-              const Icon = item.icon;
-              const active = pathname === item.href || (item.href === "/workspaces" && pathname.startsWith("/orders/"));
-              return (
-                <Link key={item.href} href={item.href} onClick={() => setMobileSidebarOpen(false)} className={cn("flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold text-muted-foreground transition-colors md:flex-1", active ? "bg-primary text-white" : "hover:bg-blue-50 hover:text-primary")}>
-                  <Icon className="h-4 w-4" />
-                  <span className="flex-1">{item.label}</span>
-                  {item.href === "/notifications" && unreadNotifications > 0 ? (
-                    <span className={cn("h-2.5 w-2.5 rounded-full bg-accent shadow-sm", active && "border border-white")} aria-label="Unread notifications" />
-                  ) : null}
-                </Link>
-              );
-            })}
-          </nav>
-        </aside>
-        <main className="mt-4 min-w-0 md:mt-0">{children}</main>
+      <Navbar mobileLinks={mobileLinks} forceMenu />
+      <div className="px-4 py-8 md:px-6 lg:px-8">
+        <main className="min-w-0">{children}</main>
       </div>
     </>
   );
