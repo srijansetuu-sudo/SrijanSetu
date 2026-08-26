@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Camera, UserCircle } from "lucide-react";
@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { showFormValidationToast, useApiMutation, useApiQuery } from "@/hooks/use-api";
 import { queryKeys } from "@/constants/query-keys";
-import { creatorService, userService } from "@/services/api-services";
+import { creatorService, uploadService, userService } from "@/services/api-services";
 import { useAuthStore } from "@/store/auth-store";
 
 const profileSchema = z.object({
@@ -54,10 +54,22 @@ function profilePath(role) {
   return "/dashboard/customer";
 }
 
+function hasRequiredUserFields(values) {
+  return Boolean(
+    values.full_name?.trim().length >= 2 &&
+    values.phone_number?.trim().length >= 7 &&
+    values.address_line?.trim().length >= 5 &&
+    values.city?.trim().length >= 2 &&
+    values.state?.trim().length >= 2 &&
+    values.postal_code?.trim().length >= 3
+  );
+}
+
 export function ProfilePage() {
   const router = useRouter();
   const { user, role, setSession } = useAuthStore();
   const isCreator = role === "CREATOR";
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const creatorProfile = useApiQuery(queryKeys.creatorProfileMe, creatorService.myProfile, { enabled: isCreator, retry: false });
   const form = useForm({
     resolver: zodResolver(profileSchema),
@@ -134,12 +146,36 @@ export function ProfilePage() {
     },
   });
 
-  const handlePhoto = (event) => {
+  const handlePhoto = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => form.setValue("avatar_url", reader.result, { shouldDirty: true });
-    reader.readAsDataURL(file);
+    setIsUploadingPhoto(true);
+    try {
+      const uploadedUrl = await uploadService.uploadFile(file, "profile-photos");
+      form.setValue("avatar_url", uploadedUrl || "", { shouldDirty: true, shouldValidate: true });
+
+      const values = { ...form.getValues(), avatar_url: uploadedUrl };
+      if (hasRequiredUserFields(values)) {
+        const updatedUser = await userService.updateMe({
+          full_name: values.full_name,
+          avatar_url: values.avatar_url || null,
+          phone_number: values.phone_number,
+          address_line: values.address_line,
+          city: values.city,
+          state: values.state,
+          postal_code: values.postal_code,
+        });
+        setSession({ user: updatedUser });
+        toast.success("Profile photo saved");
+      } else {
+        toast.success("Photo uploaded. Save your profile to keep it.");
+      }
+    } catch {
+      toast.error("Photo upload failed");
+    } finally {
+      setIsUploadingPhoto(false);
+      event.target.value = "";
+    }
   };
 
   return (
@@ -159,10 +195,10 @@ export function ProfilePage() {
                 <div className="grid h-28 w-28 place-items-center overflow-hidden rounded-full border border-border bg-muted">
                   {avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : <UserCircle className="h-14 w-14 text-muted-foreground" />}
                 </div>
-                <label className="mt-4 inline-flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-semibold text-primary shadow-sm">
+                <label className={`mt-4 inline-flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-semibold text-primary shadow-sm ${isUploadingPhoto ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}>
                   <Camera className="h-4 w-4" />
-                  Upload photo
-                  <input type="file" accept="image/*" className="hidden" onChange={handlePhoto} />
+                  {isUploadingPhoto ? "Uploading..." : "Upload photo"}
+                  <input type="file" accept="image/*" className="hidden" onChange={handlePhoto} disabled={isUploadingPhoto} />
                 </label>
                 <p className="mt-4 text-sm text-muted-foreground">{user?.email}</p>
                 <p className="mt-1 text-xs font-bold uppercase text-primary">{role}</p>
@@ -231,7 +267,7 @@ export function ProfilePage() {
                 ) : null}
 
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <Button type="submit" disabled={saveProfile.isPending}>Save profile</Button>
+                  <Button type="submit" disabled={saveProfile.isPending || isUploadingPhoto}>Save profile</Button>
                   <p className="text-sm font-semibold text-muted-foreground">Complete the required fields to continue.</p>
                 </div>
               </form>

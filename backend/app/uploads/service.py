@@ -1,4 +1,5 @@
 import os
+from uuid import uuid4
 from urllib.parse import urlparse
 
 from fastapi import UploadFile
@@ -42,6 +43,9 @@ async def upload_file(file: UploadFile, folder: str, public: bool = True) -> str
         return f"data:{content_type};base64,{encoded}"
 
     if settings.upload_provider.lower() == "cloudinary":
+        if not settings.cloudinary_cloud_name or not settings.cloudinary_api_key or not settings.cloudinary_api_secret:
+            raise UploadError("Cloudinary credentials are not configured")
+
         try:
             import cloudinary
             import cloudinary.uploader
@@ -57,7 +61,7 @@ async def upload_file(file: UploadFile, folder: str, public: bool = True) -> str
             file_bytes,
             folder=safe_folder,
             resource_type="auto",
-            public_id=os.path.splitext(safe_name)[0],
+            public_id=f"{os.path.splitext(safe_name)[0]}-{uuid4().hex[:12]}",
         )
         return result.get("secure_url") or result.get("url")
 
