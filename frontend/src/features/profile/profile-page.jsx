@@ -232,24 +232,29 @@ export function ProfilePage() {
           </div>
         </div>
 
-        <div className="grid items-start gap-6 lg:grid-cols-[320px_1fr]">
-          <Card className="h-fit">
+        <div className="grid gap-6">
+          <Card>
             <CardContent>
-              <div className="grid place-items-center text-center">
-                <div className="grid h-28 w-28 place-items-center overflow-hidden rounded-full border border-border bg-muted">
-                  {avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : <UserCircle className="h-14 w-14 text-muted-foreground" />}
+              <div className={`grid gap-5 ${isCreator ? "lg:grid-cols-[minmax(260px,0.85fr)_minmax(260px,1fr)_minmax(320px,1.25fr)]" : "lg:grid-cols-[minmax(260px,420px)_1fr]"} lg:items-stretch`}>
+                <div className="flex items-center gap-4 rounded-lg border border-border bg-muted/40 p-4">
+                  <div className="grid h-24 w-24 shrink-0 place-items-center overflow-hidden rounded-full border border-border bg-white">
+                    {avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : <UserCircle className="h-12 w-12 text-muted-foreground" />}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-lg font-bold text-primary">{user?.full_name}</p>
+                    <p className="mt-1 truncate text-sm text-muted-foreground">{user?.email}</p>
+                    <p className="mt-1 text-xs font-bold uppercase text-primary">{role}</p>
+                    <label className={`mt-4 inline-flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-semibold text-primary shadow-sm ${isUploadingPhoto ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}>
+                      <Camera className="h-4 w-4" />
+                      {isUploadingPhoto ? "Uploading..." : "Upload photo"}
+                      <input type="file" accept="image/*" className="hidden" onChange={handlePhoto} disabled={isUploadingPhoto} />
+                    </label>
+                  </div>
                 </div>
-                <label className={`mt-4 inline-flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-semibold text-primary shadow-sm ${isUploadingPhoto ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}>
-                  <Camera className="h-4 w-4" />
-                  {isUploadingPhoto ? "Uploading..." : "Upload photo"}
-                  <input type="file" accept="image/*" className="hidden" onChange={handlePhoto} disabled={isUploadingPhoto} />
-                </label>
-                <p className="mt-4 text-sm text-muted-foreground">{user?.email}</p>
-                <p className="mt-1 text-xs font-bold uppercase text-primary">{role}</p>
 
                 {isCreator ? (
-                  <div className="mt-6 w-full text-left">
-                    <div className="rounded-lg border border-border bg-muted/50 p-4">
+                  <>
+                    <div className="rounded-lg border border-border bg-muted/40 p-4">
                       <div className="flex items-center justify-between gap-3">
                         <p className="text-sm font-bold text-primary">Profile readiness</p>
                         <p className="text-sm font-bold text-primary">{completedReadinessItems}/{readinessItems.length}</p>
@@ -267,23 +272,23 @@ export function ProfilePage() {
                       </div>
                     </div>
 
-                    <div className="mt-4">
-                      <div className="mb-2 flex items-center justify-between gap-3">
+                    <div className="rounded-lg border border-border bg-muted/40 p-4">
+                      <div className="mb-3 flex items-center justify-between gap-3">
                         <p className="text-sm font-bold text-primary">Artwork</p>
                         <p className="text-xs font-semibold text-muted-foreground">{portfolioPhotos.length}/4</p>
                       </div>
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-4 gap-2">
                         {portfolioPhotos.map((photoUrl, index) => (
                           <img key={`${photoUrl}-preview-${index}`} src={photoUrl} alt={`Artwork preview ${index + 1}`} className="h-24 w-full rounded-lg object-cover" />
                         ))}
                         {Array.from({ length: Math.max(0, 4 - portfolioPhotos.length) }).map((_, index) => (
-                          <div key={`empty-artwork-${index}`} className="grid h-24 place-items-center rounded-lg border border-dashed border-border bg-muted/60 text-muted-foreground">
+                          <div key={`empty-artwork-${index}`} className="grid h-24 place-items-center rounded-lg border border-dashed border-border bg-white text-muted-foreground">
                             <ImagePlus className="h-5 w-5" />
                           </div>
                         ))}
                       </div>
                     </div>
-                  </div>
+                  </>
                 ) : null}
               </div>
             </CardContent>
