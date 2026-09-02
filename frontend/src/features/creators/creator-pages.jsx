@@ -75,6 +75,8 @@ export function CreatorDetailsPage() {
   };
   const reviews = useApiQuery(queryKeys.reviews(profile.user_id), () => reviewService.byCreator(profile.user_id), { enabled: Boolean(profile.user_id) });
   const categories = profile.categories ?? profile.creator_categories ?? [];
+  const portfolioPhotos = asArray(profile.portfolio_photos).map((photo) => photo.image_url).filter(Boolean);
+  const galleryPhotos = portfolioPhotos.length ? portfolioPhotos : [profile.portfolio_cover_url].filter(Boolean);
   const isTogglingSaved = save.isPending || removeSaved.isPending || savedCreators.isLoading;
 
   return (
@@ -88,7 +90,7 @@ export function CreatorDetailsPage() {
               <p className="mt-3 text-lg text-muted-foreground">{profile.headline}</p>
               <div className="mt-5 flex flex-wrap gap-2">{categories.map((cat, i) => <Badge key={cat.id ?? i}>{cat.category_name ?? cat}</Badge>)}</div>
               <Card className="mt-6"><CardContent><h2 className="font-bold text-primary">About</h2><p className="mt-3 text-muted-foreground">{profile.description ?? "This creator has not added a description yet."}</p></CardContent></Card>
-              <Card className="mt-6"><CardContent><h2 className="font-bold text-primary">Portfolio</h2>{profile.portfolio_cover_url ? <img src={profile.portfolio_cover_url} alt="Portfolio" className="mt-4 max-h-96 w-full rounded-lg object-cover" /> : <EmptyState title="No portfolio uploaded" />}</CardContent></Card>
+              <Card className="mt-6"><CardContent><h2 className="font-bold text-primary">Artwork</h2>{galleryPhotos.length ? <div className="mt-4 grid gap-3 sm:grid-cols-2">{galleryPhotos.map((photoUrl, index) => <img key={`${photoUrl}-${index}`} src={photoUrl} alt={`Artwork ${index + 1}`} className="h-64 w-full rounded-lg object-cover" />)}</div> : <EmptyState title="No artwork photos uploaded" />}</CardContent></Card>
             </section>
             <aside className="grid gap-4">
               <Card><CardContent><p className="text-sm text-muted-foreground">Experience</p><p className="text-2xl font-bold text-primary">{profile.years_of_experience ?? 0}+ years</p><RoleGuard roles={["CUSTOMER"]}><Button className="mt-5 w-full" variant={isSaved ? "outline" : "primary"} disabled={isTogglingSaved || !profile.user_id} onClick={toggleSaved}>{isSaved ? "Saved Creator - click to remove" : "Save Creator"}</Button></RoleGuard></CardContent></Card>

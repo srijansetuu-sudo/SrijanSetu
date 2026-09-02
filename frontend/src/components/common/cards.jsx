@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CalendarDays, IndianRupee, Sparkles, Star } from "lucide-react";
+import { CalendarDays, IndianRupee, Images, Sparkles, Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -58,11 +58,14 @@ export function RequirementCard({ requirement, href, actionLabel = "View require
 
 export function QuotationCard({ quotation, onAccept, onReject, onDelete }) {
   const statusLabel = quotation.order_status === "PENDING" ? "PAYMENT PENDING" : quotation.status;
+  const creatorProfile = quotation.creator_profile;
+  const artworkPhotos = creatorProfile?.portfolio_photos ?? [];
   return (
     <Card>
       <CardContent>
         <div className="flex items-start justify-between gap-3">
           <div>
+            {quotation.creator_name ? <p className="mb-1 text-sm font-semibold text-primary">{quotation.creator_name}</p> : null}
             <p className="font-bold text-primary">{money(quotation.proposed_price)}</p>
             <p className="mt-1 text-sm text-muted-foreground">{quotation.estimated_days} days</p>
             <p className="mt-1 text-sm text-muted-foreground">{quotation.revisions_allowed ?? 0} revisions</p>
@@ -70,6 +73,14 @@ export function QuotationCard({ quotation, onAccept, onReject, onDelete }) {
           <Badge>{statusLabel}</Badge>
         </div>
         <p className="mt-4 text-sm text-muted-foreground">{quotation.message}</p>
+        {creatorProfile ? (
+          <div className="mt-4 rounded-lg border border-border bg-muted/60 p-3 text-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="inline-flex items-center gap-2 font-semibold text-primary"><Images className="h-4 w-4" />{artworkPhotos.length ? `${artworkPhotos.length} artwork photos available` : "View creator profile"}</span>
+              <Button asChild="true" size="sm" variant="outline"><Link href={`/creators/${creatorProfile.id}`}>Review artwork</Link></Button>
+            </div>
+          </div>
+        ) : null}
         {onAccept ? (
           <div className="mt-4 rounded-lg border border-border bg-muted/60 p-3 text-sm">
             <p className="font-semibold text-primary">Workspace starts after paying the full quoted amount upfront.</p>
