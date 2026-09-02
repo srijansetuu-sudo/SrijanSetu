@@ -28,6 +28,12 @@ class CreatorProfile(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     user = relationship("User", back_populates="creator_profile")
     categories = relationship("CreatorCategory", back_populates="creator", cascade="all, delete-orphan")
+    portfolio_photos = relationship(
+        "CreatorPortfolioPhoto",
+        back_populates="creator",
+        cascade="all, delete-orphan",
+        order_by="CreatorPortfolioPhoto.display_order",
+    )
 
 
 class CreatorCategory(Base, UUIDPrimaryKeyMixin, TimestampMixin):
@@ -37,6 +43,16 @@ class CreatorCategory(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     category_name: Mapped[str] = mapped_column(String(120), index=True, nullable=False)
 
     creator = relationship("CreatorProfile", back_populates="categories")
+
+
+class CreatorPortfolioPhoto(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    __tablename__ = "creator_portfolio_photos"
+
+    creator_id: Mapped[UUID] = mapped_column(PgUUID(as_uuid=True), ForeignKey("creator_profiles.id"), index=True, nullable=False)
+    image_url: Mapped[str] = mapped_column(Text, nullable=False)
+    display_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    creator = relationship("CreatorProfile", back_populates="portfolio_photos")
 
 
 class SavedCreator(Base, UUIDPrimaryKeyMixin, TimestampMixin):

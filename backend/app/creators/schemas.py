@@ -17,11 +17,20 @@ class CreatorProfileUpsert(BlankStringAsNoneModel):
     website_url: str | None = None
     youtube_url: str | None = None
     categories: list[str] = Field(min_length=1)
+    portfolio_photos: list[str] = Field(default_factory=list, max_length=4)
 
 
 class CreatorCategoryRead(BaseModel):
     id: UUID
     category_name: str
+
+    model_config = {"from_attributes": True}
+
+
+class CreatorPortfolioPhotoRead(BaseModel):
+    id: UUID
+    image_url: str
+    display_order: int
 
     model_config = {"from_attributes": True}
 
@@ -43,6 +52,7 @@ class CreatorProfileRead(BaseModel):
     youtube_url: str | None
     is_verified_creator: bool
     categories: list[CreatorCategoryRead] = Field(default_factory=list)
+    portfolio_photos: list[CreatorPortfolioPhotoRead] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
 

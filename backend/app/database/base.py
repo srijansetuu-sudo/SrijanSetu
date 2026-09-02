@@ -2,7 +2,7 @@ from app.database.session import Base
 from app.ads.models import AdPlacement
 from app.ai.models import AiGeneration
 from app.contact.models import ContactSubmission
-from app.creators.models import CreatorCategory, CreatorProfile, SavedCreator
+from app.creators.models import CreatorCategory, CreatorPortfolioPhoto, CreatorProfile, SavedCreator
 from app.messages.models import Message
 from app.notifications.models import Notification
 from app.orders.models import Order, OrderFile
@@ -18,6 +18,7 @@ __all__ = [
     "AiGeneration",
     "ContactSubmission",
     "CreatorCategory",
+    "CreatorPortfolioPhoto",
     "CreatorProfile",
     "Message",
     "Notification",

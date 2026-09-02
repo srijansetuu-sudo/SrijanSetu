@@ -11,6 +11,7 @@ from app.orders.models import Order, OrderStatus
 from app.quotations.models import Quotation, QuotationStatus
 from app.quotations.schemas import QuotationCreate
 from app.requirements.models import Requirement, RequirementStatus
+from app.creators.models import CreatorProfile
 from app.users.models import User
 
 
@@ -53,7 +54,15 @@ async def list_for_requirement(db: AsyncSession, user: User, requirement_id: UUI
         raise ForbiddenError("Only the requirement owner can view quotations")
     result = await db.scalars(
         select(Quotation)
-        .options(selectinload(Quotation.order))
+        .options(
+            selectinload(Quotation.order),
+            selectinload(Quotation.creator)
+            .selectinload(User.creator_profile)
+            .selectinload(CreatorProfile.portfolio_photos),
+            selectinload(Quotation.creator)
+            .selectinload(User.creator_profile)
+            .selectinload(CreatorProfile.categories),
+        )
         .where(Quotation.requirement_id == requirement_id)
     )
     return list(result)

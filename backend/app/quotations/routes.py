@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.dependencies import get_current_active_user, require_creator, require_customer
 from app.auth.schemas import APIResponse
 from app.database.session import get_db
+from app.creators.schemas import CreatorProfileRead
 from app.orders.schemas import OrderRead
 from app.quotations import service
 from app.quotations.schemas import QuotationCreate, QuotationRead
@@ -19,6 +20,10 @@ def _quotation_payload(quotation):
     if quotation.order:
         item["order_id"] = str(quotation.order.id)
         item["order_status"] = quotation.order.status.value
+    if quotation.creator:
+        item["creator_name"] = quotation.creator.full_name
+        if quotation.creator.creator_profile:
+            item["creator_profile"] = CreatorProfileRead.model_validate(quotation.creator.creator_profile).model_dump(mode="json")
     return item
 
 

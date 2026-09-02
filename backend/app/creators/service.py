@@ -5,18 +5,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.exceptions import APIError, NotFoundError
-from app.creators.models import CreatorCategory, CreatorProfile, SavedCreator
+from app.creators.models import CreatorCategory, CreatorPortfolioPhoto, CreatorProfile, SavedCreator
 from app.creators.schemas import CreatorProfileUpsert
 from app.users.models import User
 
 
 async def upsert_profile(db: AsyncSession, user: User, payload: CreatorProfileUpsert) -> CreatorProfile:
     profile = await db.scalar(select(CreatorProfile).where(CreatorProfile.user_id == user.id))
-    data = payload.model_dump(exclude={"categories"})
+    data = payload.model_dump(exclude={"categories", "portfolio_photos"})
+    portfolio_photos = [url.strip() for url in payload.portfolio_photos if url and url.strip()]
+    if len(portfolio_photos) > 4:
+        raise APIError("Creator profiles can include up to 4 artwork photos")
     if profile:
         for key, value in data.items():
             setattr(profile, key, value)
         await db.execute(delete(CreatorCategory).where(CreatorCategory.creator_id == profile.id))
+        await db.execute(delete(CreatorPortfolioPhoto).where(CreatorPortfolioPhoto.creator_id == profile.id))
     else:
         profile = CreatorProfile(user_id=user.id, **data)
         db.add(profile)
@@ -27,6 +31,9 @@ async def upsert_profile(db: AsyncSession, user: User, payload: CreatorProfileUp
         if clean:
             db.add(CreatorCategory(creator_id=profile.id, category_name=clean))
 
+    for index, image_url in enumerate(portfolio_photos):
+        db.add(CreatorPortfolioPhoto(creator_id=profile.id, image_url=image_url, display_order=index))
+
     await db.commit()
     return await get_profile(db, profile.id)
 
@@ -35,7 +42,7 @@ async def list_profiles(db: AsyncSession, limit: int, offset: int, search: str |
     statement = (
         select(CreatorProfile)
         .join(CreatorProfile.user)
-        .options(selectinload(CreatorProfile.categories))
+        .options(selectinload(CreatorProfile.categories), selectinload(CreatorProfile.portfolio_photos))
         .order_by(CreatorProfile.created_at.desc())
         .offset(offset)
         .limit(limit)
@@ -63,7 +70,9 @@ async def list_profiles(db: AsyncSession, limit: int, offset: int, search: str |
 
 async def get_profile(db: AsyncSession, creator_id: UUID) -> CreatorProfile:
     profile = await db.scalar(
-        select(CreatorProfile).options(selectinload(CreatorProfile.categories)).where(CreatorProfile.id == creator_id)
+        select(CreatorProfile)
+        .options(selectinload(CreatorProfile.categories), selectinload(CreatorProfile.portfolio_photos))
+        .where(CreatorProfile.id == creator_id)
     )
     if not profile:
         raise NotFoundError("Creator profile not found")
@@ -73,7 +82,7 @@ async def get_profile(db: AsyncSession, creator_id: UUID) -> CreatorProfile:
 async def get_profile_by_user(db: AsyncSession, user: User) -> CreatorProfile:
     profile = await db.scalar(
         select(CreatorProfile)
-        .options(selectinload(CreatorProfile.categories))
+        .options(selectinload(CreatorProfile.categories), selectinload(CreatorProfile.portfolio_photos))
         .where(CreatorProfile.user_id == user.id)
     )
     if not profile:
@@ -109,7 +118,10 @@ async def remove_saved_creator(db: AsyncSession, user: User, creator_user_id: UU
 async def list_saved_creators(db: AsyncSession, user: User) -> list[SavedCreator]:
     result = await db.scalars(
         select(SavedCreator)
-        .options(selectinload(SavedCreator.creator_profile).selectinload(CreatorProfile.categories))
+        .options(
+            selectinload(SavedCreator.creator_profile).selectinload(CreatorProfile.categories),
+            selectinload(SavedCreator.creator_profile).selectinload(CreatorProfile.portfolio_photos),
+        )
         .where(SavedCreator.customer_id == user.id)
     )
     return list(result)

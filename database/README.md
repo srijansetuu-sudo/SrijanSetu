@@ -7,6 +7,7 @@ SrijanSetu uses PostgreSQL. The backend owns database access through SQLAlchemy 
 - `users`: customers, creators, and admins with auth, username, activity, and login metadata
 - `creator_profiles`: creator-specific brand, headline, portfolio, social links, rating, response, and verification metadata
 - `creator_categories`: categories each creator can work in
+- `creator_portfolio_photos`: up to four artwork photos shown on creator profiles
 - `requirements`: custom product ideas posted by customers
 - `requirement_references`: uploaded images/design references for a requirement
 - `quotations`: creator responses with price and timeline
