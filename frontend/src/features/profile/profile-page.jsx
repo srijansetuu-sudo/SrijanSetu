@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Camera, UserCircle } from "lucide-react";
+import { Camera, ImagePlus, Trash2, UserCircle } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -17,6 +17,7 @@ import { showFormValidationToast, useApiMutation, useApiQuery } from "@/hooks/us
 import { queryKeys } from "@/constants/query-keys";
 import { creatorService, uploadService, userService } from "@/services/api-services";
 import { useAuthStore } from "@/store/auth-store";
+import { asArray } from "@/lib/utils";
 
 const profileSchema = z.object({
   full_name: z.string().min(2, "Your name is required"),
@@ -36,6 +37,7 @@ const profileSchema = z.object({
   website_url: z.string().optional(),
   youtube_url: z.string().optional(),
   categories: z.string().optional(),
+  portfolio_photos: z.array(z.string()).max(4).optional(),
 });
 
 function Field({ label, required = false, children, error }) {
@@ -70,6 +72,8 @@ export function ProfilePage() {
   const { user, role, setSession } = useAuthStore();
   const isCreator = role === "CREATOR";
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [portfolioPhotos, setPortfolioPhotos] = useState([]);
+  const [isUploadingArtwork, setIsUploadingArtwork] = useState(false);
   const creatorProfile = useApiQuery(queryKeys.creatorProfileMe, creatorService.myProfile, { enabled: isCreator, retry: false });
   const form = useForm({
     resolver: zodResolver(profileSchema),
@@ -86,9 +90,19 @@ export function ProfilePage() {
     },
   });
   const avatarUrl = form.watch("avatar_url");
+  const watchedValues = form.watch();
+  const readinessItems = [
+    { label: "Contact", done: hasRequiredUserFields(watchedValues) },
+    { label: "Studio", done: Boolean(watchedValues.brand_name?.trim() && watchedValues.headline?.trim() && watchedValues.description?.trim() && watchedValues.categories?.trim()) },
+    { label: "Artwork", done: portfolioPhotos.length > 0 },
+  ];
+  const completedReadinessItems = readinessItems.filter((item) => item.done).length;
 
   useEffect(() => {
     const creator = creatorProfile.data ?? {};
+    const photos = asArray(creator.portfolio_photos).map((photo) => photo.image_url).filter(Boolean);
+    const fallbackPhotos = photos.length ? photos : [creator.portfolio_cover_url].filter(Boolean);
+    setPortfolioPhotos(fallbackPhotos.slice(0, 4));
     form.reset({
       full_name: user?.full_name ?? "",
       avatar_url: user?.avatar_url ?? "",
@@ -127,12 +141,13 @@ export function ProfilePage() {
         headline: values.headline,
         description: values.description,
         years_of_experience: values.years_of_experience ?? 0,
-        portfolio_cover_url: values.portfolio_cover_url,
         response_time_hours: values.response_time_hours || null,
         instagram_url: values.instagram_url,
         website_url: values.website_url,
         youtube_url: values.youtube_url,
         categories: values.categories?.split(",").map((item) => item.trim()).filter(Boolean) ?? [],
+        portfolio_photos: portfolioPhotos,
+        portfolio_cover_url: portfolioPhotos[0] || values.portfolio_cover_url || undefined,
       });
     }
 
@@ -178,6 +193,35 @@ export function ProfilePage() {
     }
   };
 
+  const handleArtworkPhotos = async (event) => {
+    const files = Array.from(event.target.files ?? []);
+    const availableSlots = 4 - portfolioPhotos.length;
+    const selectedFiles = files.slice(0, availableSlots);
+    if (!selectedFiles.length) {
+      event.target.value = "";
+      return;
+    }
+    const invalidFile = selectedFiles.find((file) => !file.type.startsWith("image/") || file.size > 5_000_000);
+    if (invalidFile) {
+      showFormValidationToast({ portfolio_photos: { message: "Artwork photos must be images under 5 MB" } });
+      event.target.value = "";
+      return;
+    }
+    setIsUploadingArtwork(true);
+    try {
+      const uploadedUrls = [];
+      for (const file of selectedFiles) {
+        uploadedUrls.push(await uploadService.uploadFile(file, "creator-artwork"));
+      }
+      setPortfolioPhotos((current) => [...current, ...uploadedUrls.filter(Boolean)].slice(0, 4));
+    } catch {
+      showFormValidationToast({ portfolio_photos: { message: "Artwork photo upload failed" } });
+    } finally {
+      setIsUploadingArtwork(false);
+      event.target.value = "";
+    }
+  };
+
   return (
     <ProtectedRoute>
       <DashboardShell role={role}>
@@ -188,8 +232,8 @@ export function ProfilePage() {
           </div>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
-          <Card>
+        <div className="grid items-start gap-6 lg:grid-cols-[320px_1fr]">
+          <Card className="h-fit">
             <CardContent>
               <div className="grid place-items-center text-center">
                 <div className="grid h-28 w-28 place-items-center overflow-hidden rounded-full border border-border bg-muted">
@@ -202,6 +246,45 @@ export function ProfilePage() {
                 </label>
                 <p className="mt-4 text-sm text-muted-foreground">{user?.email}</p>
                 <p className="mt-1 text-xs font-bold uppercase text-primary">{role}</p>
+
+                {isCreator ? (
+                  <div className="mt-6 w-full text-left">
+                    <div className="rounded-lg border border-border bg-muted/50 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-sm font-bold text-primary">Profile readiness</p>
+                        <p className="text-sm font-bold text-primary">{completedReadinessItems}/{readinessItems.length}</p>
+                      </div>
+                      <div className="mt-3 h-2 overflow-hidden rounded-full bg-white">
+                        <div className="h-full rounded-full bg-accent" style={{ width: `${(completedReadinessItems / readinessItems.length) * 100}%` }} />
+                      </div>
+                      <div className="mt-4 grid gap-2">
+                        {readinessItems.map((item) => (
+                          <div key={item.label} className="flex items-center justify-between gap-3 text-xs font-semibold">
+                            <span className="text-muted-foreground">{item.label}</span>
+                            <span className={item.done ? "text-primary" : "text-muted-foreground"}>{item.done ? "Done" : "Pending"}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="mt-4">
+                      <div className="mb-2 flex items-center justify-between gap-3">
+                        <p className="text-sm font-bold text-primary">Artwork</p>
+                        <p className="text-xs font-semibold text-muted-foreground">{portfolioPhotos.length}/4</p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        {portfolioPhotos.map((photoUrl, index) => (
+                          <img key={`${photoUrl}-preview-${index}`} src={photoUrl} alt={`Artwork preview ${index + 1}`} className="h-24 w-full rounded-lg object-cover" />
+                        ))}
+                        {Array.from({ length: Math.max(0, 4 - portfolioPhotos.length) }).map((_, index) => (
+                          <div key={`empty-artwork-${index}`} className="grid h-24 place-items-center rounded-lg border border-dashed border-border bg-muted/60 text-muted-foreground">
+                            <ImagePlus className="h-5 w-5" />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </CardContent>
           </Card>
@@ -258,6 +341,25 @@ export function ProfilePage() {
                       <Field label="Categories" required error={form.formState.errors.categories}><Input placeholder="Paintings, pottery, home decor" {...form.register("categories")} /></Field>
                     </div>
                     <Field label="Portfolio cover URL" error={form.formState.errors.portfolio_cover_url}><Input {...form.register("portfolio_cover_url")} /></Field>
+                    <div className="grid gap-2 text-sm font-semibold text-primary">
+                      <span>Artwork photos</span>
+                      {portfolioPhotos.length ? (
+                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                          {portfolioPhotos.map((photoUrl, index) => (
+                            <div key={`${photoUrl}-${index}`} className="relative overflow-hidden rounded-lg border border-border bg-muted">
+                              <img src={photoUrl} alt={`Artwork ${index + 1}`} className="h-36 w-full object-cover" />
+                              <Button type="button" size="icon" variant="outline" className="absolute right-2 top-2 h-8 w-8 bg-white/90" onClick={() => setPortfolioPhotos((current) => current.filter((_, itemIndex) => itemIndex !== index))} aria-label="Remove artwork photo">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                      <div className="flex flex-wrap items-center gap-3">
+                        <input type="file" accept="image/*" multiple onChange={handleArtworkPhotos} disabled={isUploadingArtwork || portfolioPhotos.length >= 4} className="rounded-lg border border-border bg-muted px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60" />
+                        <span className="inline-flex items-center gap-2 text-xs font-normal text-muted-foreground"><ImagePlus className="h-4 w-4" />{isUploadingArtwork ? "Uploading artwork..." : `${portfolioPhotos.length}/4 artwork photos added`}</span>
+                      </div>
+                    </div>
                     <div className="grid gap-4 md:grid-cols-3">
                       <Field label="Instagram" error={form.formState.errors.instagram_url}><Input {...form.register("instagram_url")} /></Field>
                       <Field label="Website" error={form.formState.errors.website_url}><Input {...form.register("website_url")} /></Field>
