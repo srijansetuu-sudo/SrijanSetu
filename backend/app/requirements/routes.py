@@ -16,7 +16,7 @@ router = APIRouter(prefix="/requirements", tags=["requirements"])
 
 def _requirement_payload(requirement):
     item = RequirementRead.model_validate(requirement).model_dump(mode="json")
-    order = getattr(requirement, "order", None)
+    order = requirement.__dict__.get("order")
     if order:
         item["order_id"] = str(order.id)
         item["order_status"] = order.status.value
