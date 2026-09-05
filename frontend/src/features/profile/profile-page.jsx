@@ -471,49 +471,57 @@ export function ProfilePage() {
         </div>
 
         {cropDraft ? (
-          <div className="fixed inset-0 z-50 grid place-items-center bg-primary/50 p-4 backdrop-blur-sm">
-            <div className="w-full max-w-2xl rounded-lg bg-white p-5 shadow-[0_24px_80px_rgba(31,44,119,0.24)]">
+          <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-primary/50 p-4 backdrop-blur-sm">
+            <div className="max-h-[calc(100vh-2rem)] w-full max-w-5xl overflow-y-auto rounded-lg bg-white p-5 shadow-[0_24px_80px_rgba(31,44,119,0.24)]">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h2 className="text-xl font-bold text-primary">Crop artwork photo</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">Frame the artwork before it is uploaded.</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Use zoom and position controls, then upload the framed image.</p>
                 </div>
                 <p className="text-sm font-semibold text-muted-foreground">{portfolioPhotos.length + 1}/4</p>
               </div>
 
-              <div className="mt-5 overflow-hidden rounded-lg border border-border bg-muted">
-                <div className="aspect-[4/3] overflow-hidden">
-                  <img
-                    src={cropDraft.url}
-                    alt="Artwork crop preview"
-                    className="h-full w-full object-cover"
-                    style={{
-                      transform: `translate(${cropOffsetX * 0.35}%, ${cropOffsetY * 0.35}%) scale(${cropZoom})`,
-                      transformOrigin: "center",
-                    }}
-                  />
+              <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
+                <div className="overflow-hidden rounded-lg border border-border bg-muted">
+                  <div className="relative aspect-[4/3] max-h-[56vh] overflow-hidden">
+                    <img
+                      src={cropDraft.url}
+                      alt="Artwork crop preview"
+                      className="h-full w-full object-cover"
+                      style={{
+                        transform: `translate(${cropOffsetX * 0.35}%, ${cropOffsetY * 0.35}%) scale(${cropZoom})`,
+                        transformOrigin: "center",
+                      }}
+                    />
+                    <div className="pointer-events-none absolute inset-0 border-[12px] border-white/35" />
+                    <div className="pointer-events-none absolute inset-0 ring-2 ring-inset ring-white/80" />
+                  </div>
                 </div>
-              </div>
 
-              <div className="mt-5 grid gap-4 md:grid-cols-3">
-                <label className="grid gap-2 text-sm font-semibold text-primary">
-                  Zoom
-                  <input type="range" min="1" max="2.5" step="0.05" value={cropZoom} onChange={(event) => setCropZoom(Number(event.target.value))} />
-                </label>
-                <label className="grid gap-2 text-sm font-semibold text-primary">
-                  Move left/right
-                  <input type="range" min="-100" max="100" step="1" value={cropOffsetX} onChange={(event) => setCropOffsetX(Number(event.target.value))} />
-                </label>
-                <label className="grid gap-2 text-sm font-semibold text-primary">
-                  Move up/down
-                  <input type="range" min="-100" max="100" step="1" value={cropOffsetY} onChange={(event) => setCropOffsetY(Number(event.target.value))} />
-                </label>
-              </div>
+                <div className="grid content-between gap-5 rounded-lg border border-border bg-muted/40 p-4">
+                  <div className="grid gap-4">
+                    <label className="grid gap-2 text-sm font-semibold text-primary">
+                      Zoom
+                      <input type="range" min="1" max="2.5" step="0.05" value={cropZoom} onChange={(event) => setCropZoom(Number(event.target.value))} />
+                    </label>
+                    <label className="grid gap-2 text-sm font-semibold text-primary">
+                      Move left/right
+                      <input type="range" min="-100" max="100" step="1" value={cropOffsetX} onChange={(event) => setCropOffsetX(Number(event.target.value))} />
+                    </label>
+                    <label className="grid gap-2 text-sm font-semibold text-primary">
+                      Move up/down
+                      <input type="range" min="-100" max="100" step="1" value={cropOffsetY} onChange={(event) => setCropOffsetY(Number(event.target.value))} />
+                    </label>
+                  </div>
 
-              <div className="mt-6 flex flex-wrap justify-end gap-3">
-                <Button type="button" variant="outline" disabled={isUploadingArtwork} onClick={() => { closeArtworkCrop(); openNextArtworkCrop(artworkQueue); }}>Skip</Button>
-                <Button type="button" variant="outline" disabled={isUploadingArtwork} onClick={closeArtworkCrop}>Cancel</Button>
-                <Button type="button" disabled={isUploadingArtwork} onClick={confirmArtworkCrop}>{isUploadingArtwork ? "Uploading..." : "Crop and upload"}</Button>
+                  <div className="grid gap-2">
+                    <Button type="button" disabled={isUploadingArtwork} onClick={confirmArtworkCrop}>{isUploadingArtwork ? "Uploading..." : "Crop and upload"}</Button>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button type="button" variant="outline" disabled={isUploadingArtwork} onClick={() => { closeArtworkCrop(); openNextArtworkCrop(artworkQueue); }}>Skip</Button>
+                      <Button type="button" variant="outline" disabled={isUploadingArtwork} onClick={closeArtworkCrop}>Cancel</Button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
