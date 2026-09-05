@@ -336,8 +336,11 @@ export function RequirementFormPage() {
     ].filter(Boolean);
 
     const payload = {
-      ...values,
+      title: values.title?.trim(),
       description: [values.description?.trim(), ...detailLines].filter(Boolean).join("\n\n"),
+      budget_min: values.budget_min,
+      budget_max: values.budget_max,
+      deadline: values.deadline || undefined,
       ai_generated_reference: referencePhoto || values.ai_generated_reference || undefined,
     };
 
@@ -391,7 +394,7 @@ export function RequirementFormPage() {
               <FormField label="Deadline" error={errors.deadline}>
                 <Input type="date" min={minDeadline} {...register("deadline")} />
               </FormField>
-              <Button disabled={create.isPending}>Create requirement</Button>
+              <Button disabled={create.isPending || isUploadingPhoto}>{isUploadingPhoto ? "Uploading photo..." : "Create requirement"}</Button>
             </form>
           </CardContent>
         </Card>

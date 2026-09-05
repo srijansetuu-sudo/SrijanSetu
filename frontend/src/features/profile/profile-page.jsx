@@ -435,7 +435,6 @@ export function ProfilePage() {
                       <Field label="Response time hours" error={form.formState.errors.response_time_hours}><Input type="number" {...form.register("response_time_hours")} /></Field>
                       <Field label="Categories" required error={form.formState.errors.categories}><Input placeholder="Paintings, pottery, home decor" {...form.register("categories")} /></Field>
                     </div>
-                    <Field label="Portfolio cover URL" error={form.formState.errors.portfolio_cover_url}><Input {...form.register("portfolio_cover_url")} /></Field>
                     <div className="grid gap-2 text-sm font-semibold text-primary">
                       <span>Artwork photos</span>
                       {portfolioPhotos.length ? (
