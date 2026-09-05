@@ -250,14 +250,16 @@ export function ProfilePage() {
     canvas.width = width;
     canvas.height = height;
     const context = canvas.getContext("2d");
-    const scale = Math.max(width / image.width, height / image.height) * cropZoom;
+    const scale = Math.min(width / image.width, height / image.height) * cropZoom;
     const drawnWidth = image.width * scale;
     const drawnHeight = image.height * scale;
-    const maxOffsetX = Math.max(0, (drawnWidth - width) / 2);
-    const maxOffsetY = Math.max(0, (drawnHeight - height) / 2);
+    const maxOffsetX = Math.max(width * 0.35, Math.abs(width - drawnWidth) / 2);
+    const maxOffsetY = Math.max(height * 0.35, Math.abs(height - drawnHeight) / 2);
     const x = (width - drawnWidth) / 2 + (cropOffsetX / 100) * maxOffsetX;
     const y = (height - drawnHeight) / 2 + (cropOffsetY / 100) * maxOffsetY;
 
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, width, height);
     context.drawImage(image, x, y, drawnWidth, drawnHeight);
     const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.9));
     if (!blob) throw new Error("Crop failed");
@@ -472,7 +474,7 @@ export function ProfilePage() {
 
         {cropDraft ? (
           <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-primary/50 p-4 backdrop-blur-sm">
-            <div className="max-h-[calc(100vh-2rem)] w-full max-w-5xl overflow-y-auto rounded-lg bg-white p-5 shadow-[0_24px_80px_rgba(31,44,119,0.24)]">
+            <div className="max-h-[calc(100vh-2rem)] w-full max-w-4xl overflow-y-auto rounded-lg bg-white p-5 shadow-[0_24px_80px_rgba(31,44,119,0.24)]">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h2 className="text-xl font-bold text-primary">Crop artwork photo</h2>
@@ -481,20 +483,19 @@ export function ProfilePage() {
                 <p className="text-sm font-semibold text-muted-foreground">{portfolioPhotos.length + 1}/4</p>
               </div>
 
-              <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
+              <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,620px)_280px] lg:justify-center">
                 <div className="overflow-hidden rounded-lg border border-border bg-muted">
-                  <div className="relative aspect-[4/3] max-h-[56vh] overflow-hidden">
+                  <div className="relative aspect-[4/3] max-h-[52vh] overflow-hidden bg-white">
                     <img
                       src={cropDraft.url}
                       alt="Artwork crop preview"
-                      className="h-full w-full object-cover"
+                      className="h-full w-full object-contain"
                       style={{
-                        transform: `translate(${cropOffsetX * 0.35}%, ${cropOffsetY * 0.35}%) scale(${cropZoom})`,
+                        transform: `translate(${cropOffsetX * 0.25}%, ${cropOffsetY * 0.25}%) scale(${cropZoom})`,
                         transformOrigin: "center",
                       }}
                     />
-                    <div className="pointer-events-none absolute inset-0 border-[12px] border-white/35" />
-                    <div className="pointer-events-none absolute inset-0 ring-2 ring-inset ring-white/80" />
+                    <div className="pointer-events-none absolute inset-0 ring-2 ring-inset ring-primary/30" />
                   </div>
                 </div>
 
