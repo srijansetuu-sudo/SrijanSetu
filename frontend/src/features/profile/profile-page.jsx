@@ -74,6 +74,11 @@ export function ProfilePage() {
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [portfolioPhotos, setPortfolioPhotos] = useState([]);
   const [isUploadingArtwork, setIsUploadingArtwork] = useState(false);
+  const [artworkQueue, setArtworkQueue] = useState([]);
+  const [cropDraft, setCropDraft] = useState(null);
+  const [cropZoom, setCropZoom] = useState(1);
+  const [cropOffsetX, setCropOffsetX] = useState(0);
+  const [cropOffsetY, setCropOffsetY] = useState(0);
   const creatorProfile = useApiQuery(queryKeys.creatorProfileMe, creatorService.myProfile, { enabled: isCreator, retry: false });
   const form = useForm({
     resolver: zodResolver(profileSchema),
@@ -136,19 +141,7 @@ export function ProfilePage() {
     });
 
     if (isCreator) {
-      await creatorService.updateProfile({
-        brand_name: values.brand_name,
-        headline: values.headline,
-        description: values.description,
-        years_of_experience: values.years_of_experience ?? 0,
-        response_time_hours: values.response_time_hours || null,
-        instagram_url: values.instagram_url,
-        website_url: values.website_url,
-        youtube_url: values.youtube_url,
-        categories: values.categories?.split(",").map((item) => item.trim()).filter(Boolean) ?? [],
-        portfolio_photos: portfolioPhotos,
-        portfolio_cover_url: portfolioPhotos[0] || values.portfolio_cover_url || undefined,
-      });
+      await creatorService.updateProfile(creatorProfilePayload(values, portfolioPhotos));
     }
 
     return updatedUser;
@@ -193,6 +186,102 @@ export function ProfilePage() {
     }
   };
 
+  const creatorProfilePayload = (values, nextPortfolioPhotos) => ({
+    brand_name: values.brand_name,
+    headline: values.headline,
+    description: values.description,
+    years_of_experience: values.years_of_experience ?? 0,
+    response_time_hours: values.response_time_hours || null,
+    instagram_url: values.instagram_url,
+    website_url: values.website_url,
+    youtube_url: values.youtube_url,
+    categories: values.categories?.split(",").map((item) => item.trim()).filter(Boolean) ?? [],
+    portfolio_photos: nextPortfolioPhotos,
+    portfolio_cover_url: nextPortfolioPhotos[0] || values.portfolio_cover_url || undefined,
+  });
+
+  const canSaveCreatorArtwork = (values) => Boolean(
+    values.brand_name?.trim() &&
+    values.headline?.trim() &&
+    values.description?.trim() &&
+    values.categories?.trim()
+  );
+
+  const persistArtworkPhotos = async (nextPortfolioPhotos) => {
+    if (!isCreator) return;
+    const values = form.getValues();
+    if (!canSaveCreatorArtwork(values)) {
+      toast.success("Artwork ready. Complete creator details and save profile.");
+      return;
+    }
+    await creatorService.updateProfile(creatorProfilePayload(values, nextPortfolioPhotos));
+    toast.success("Artwork saved");
+  };
+
+  const openNextArtworkCrop = (queue) => {
+    const [nextFile, ...remainingFiles] = queue;
+    if (!nextFile) {
+      setArtworkQueue([]);
+      return;
+    }
+    setArtworkQueue(remainingFiles);
+    setCropDraft({ file: nextFile, url: URL.createObjectURL(nextFile) });
+    setCropZoom(1);
+    setCropOffsetX(0);
+    setCropOffsetY(0);
+  };
+
+  const closeArtworkCrop = () => {
+    if (cropDraft?.url) URL.revokeObjectURL(cropDraft.url);
+    setCropDraft(null);
+  };
+
+  const makeCroppedArtworkFile = async () => {
+    const image = new Image();
+    await new Promise((resolve, reject) => {
+      image.onload = resolve;
+      image.onerror = reject;
+      image.src = cropDraft.url;
+    });
+
+    const width = 1200;
+    const height = 900;
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d");
+    const scale = Math.max(width / image.width, height / image.height) * cropZoom;
+    const drawnWidth = image.width * scale;
+    const drawnHeight = image.height * scale;
+    const maxOffsetX = Math.max(0, (drawnWidth - width) / 2);
+    const maxOffsetY = Math.max(0, (drawnHeight - height) / 2);
+    const x = (width - drawnWidth) / 2 + (cropOffsetX / 100) * maxOffsetX;
+    const y = (height - drawnHeight) / 2 + (cropOffsetY / 100) * maxOffsetY;
+
+    context.drawImage(image, x, y, drawnWidth, drawnHeight);
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.9));
+    if (!blob) throw new Error("Crop failed");
+    return new File([blob], cropDraft.file.name.replace(/\.[^.]+$/, "-cropped.jpg"), { type: "image/jpeg" });
+  };
+
+  const confirmArtworkCrop = async () => {
+    if (!cropDraft) return;
+    setIsUploadingArtwork(true);
+    try {
+      const croppedFile = await makeCroppedArtworkFile();
+      const uploadedUrl = await uploadService.uploadFile(croppedFile, "creator-artwork");
+      const nextPhotos = [...portfolioPhotos, uploadedUrl].filter(Boolean).slice(0, 4);
+      setPortfolioPhotos(nextPhotos);
+      await persistArtworkPhotos(nextPhotos);
+      closeArtworkCrop();
+      openNextArtworkCrop(artworkQueue);
+    } catch {
+      showFormValidationToast({ portfolio_photos: { message: "Artwork crop or upload failed" } });
+    } finally {
+      setIsUploadingArtwork(false);
+    }
+  };
+
   const handleArtworkPhotos = async (event) => {
     const files = Array.from(event.target.files ?? []);
     const availableSlots = 4 - portfolioPhotos.length;
@@ -207,18 +296,17 @@ export function ProfilePage() {
       event.target.value = "";
       return;
     }
-    setIsUploadingArtwork(true);
+    openNextArtworkCrop(selectedFiles);
+    event.target.value = "";
+  };
+
+  const removeArtworkPhoto = async (index) => {
+    const nextPhotos = portfolioPhotos.filter((_, itemIndex) => itemIndex !== index);
+    setPortfolioPhotos(nextPhotos);
     try {
-      const uploadedUrls = [];
-      for (const file of selectedFiles) {
-        uploadedUrls.push(await uploadService.uploadFile(file, "creator-artwork"));
-      }
-      setPortfolioPhotos((current) => [...current, ...uploadedUrls.filter(Boolean)].slice(0, 4));
+      await persistArtworkPhotos(nextPhotos);
     } catch {
-      showFormValidationToast({ portfolio_photos: { message: "Artwork photo upload failed" } });
-    } finally {
-      setIsUploadingArtwork(false);
-      event.target.value = "";
+      showFormValidationToast({ portfolio_photos: { message: "Artwork update failed" } });
     }
   };
 
@@ -353,7 +441,7 @@ export function ProfilePage() {
                           {portfolioPhotos.map((photoUrl, index) => (
                             <div key={`${photoUrl}-${index}`} className="relative overflow-hidden rounded-lg border border-border bg-muted">
                               <img src={photoUrl} alt={`Artwork ${index + 1}`} className="h-36 w-full object-cover" />
-                              <Button type="button" size="icon" variant="outline" className="absolute right-2 top-2 h-8 w-8 bg-white/90" onClick={() => setPortfolioPhotos((current) => current.filter((_, itemIndex) => itemIndex !== index))} aria-label="Remove artwork photo">
+                              <Button type="button" size="icon" variant="outline" className="absolute right-2 top-2 h-8 w-8 bg-white/90" onClick={() => removeArtworkPhoto(index)} aria-label="Remove artwork photo">
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
@@ -381,6 +469,55 @@ export function ProfilePage() {
             </CardContent>
           </Card>
         </div>
+
+        {cropDraft ? (
+          <div className="fixed inset-0 z-50 grid place-items-center bg-primary/50 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-2xl rounded-lg bg-white p-5 shadow-[0_24px_80px_rgba(31,44,119,0.24)]">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-bold text-primary">Crop artwork photo</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">Frame the artwork before it is uploaded.</p>
+                </div>
+                <p className="text-sm font-semibold text-muted-foreground">{portfolioPhotos.length + 1}/4</p>
+              </div>
+
+              <div className="mt-5 overflow-hidden rounded-lg border border-border bg-muted">
+                <div className="aspect-[4/3] overflow-hidden">
+                  <img
+                    src={cropDraft.url}
+                    alt="Artwork crop preview"
+                    className="h-full w-full object-cover"
+                    style={{
+                      transform: `translate(${cropOffsetX * 0.35}%, ${cropOffsetY * 0.35}%) scale(${cropZoom})`,
+                      transformOrigin: "center",
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="mt-5 grid gap-4 md:grid-cols-3">
+                <label className="grid gap-2 text-sm font-semibold text-primary">
+                  Zoom
+                  <input type="range" min="1" max="2.5" step="0.05" value={cropZoom} onChange={(event) => setCropZoom(Number(event.target.value))} />
+                </label>
+                <label className="grid gap-2 text-sm font-semibold text-primary">
+                  Move left/right
+                  <input type="range" min="-100" max="100" step="1" value={cropOffsetX} onChange={(event) => setCropOffsetX(Number(event.target.value))} />
+                </label>
+                <label className="grid gap-2 text-sm font-semibold text-primary">
+                  Move up/down
+                  <input type="range" min="-100" max="100" step="1" value={cropOffsetY} onChange={(event) => setCropOffsetY(Number(event.target.value))} />
+                </label>
+              </div>
+
+              <div className="mt-6 flex flex-wrap justify-end gap-3">
+                <Button type="button" variant="outline" disabled={isUploadingArtwork} onClick={() => { closeArtworkCrop(); openNextArtworkCrop(artworkQueue); }}>Skip</Button>
+                <Button type="button" variant="outline" disabled={isUploadingArtwork} onClick={closeArtworkCrop}>Cancel</Button>
+                <Button type="button" disabled={isUploadingArtwork} onClick={confirmArtworkCrop}>{isUploadingArtwork ? "Uploading..." : "Crop and upload"}</Button>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </DashboardShell>
     </ProtectedRoute>
   );
