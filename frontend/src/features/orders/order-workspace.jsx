@@ -73,6 +73,15 @@ function isImageAttachment(message) {
   return message.attachment_type === "image" || inferAttachmentType(message.attachment_url || "") === "image";
 }
 
+function workspaceWebsocketUrl(orderId, token) {
+  if (typeof window === "undefined") return "";
+  const isLocalPage = ["localhost", "127.0.0.1"].includes(window.location.hostname);
+  if (isLocalPage) return messageService.websocketUrl(orderId, token);
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  const params = new URLSearchParams({ token });
+  return `${protocol}//${window.location.host}/api/v1/messages/orders/${orderId}/ws?${params}`;
+}
+
 function PersonSummary({ label, person, linkProfile = false }) {
   const address = [person?.address_line, person?.city, person?.state, person?.postal_code].filter(Boolean).join(", ");
   const content = (
@@ -180,12 +189,13 @@ export function OrderWorkspacePage() {
     const connect = () => {
       if (stopped) return;
       setChatStatus("connecting");
-      const socket = new WebSocket(messageService.websocketUrl(id, accessToken));
+      const socket = new WebSocket(workspaceWebsocketUrl(id, accessToken));
       socketRef.current = socket;
 
       socket.onopen = () => {
         retryAttempt = 0;
         setChatStatus("live");
+        queryClient.invalidateQueries({ queryKey: queryKeys.messages(id) });
       };
 
       socket.onmessage = (event) => {
@@ -197,6 +207,7 @@ export function OrderWorkspacePage() {
         }
         if (payload.type === "connected") {
           setChatStatus("live");
+          queryClient.invalidateQueries({ queryKey: queryKeys.messages(id) });
           return;
         }
         if (payload.type === "message" && payload.message) {
