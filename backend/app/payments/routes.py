@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import get_current_active_user, require_customer
 from app.auth.schemas import APIResponse
+from app.core.config import settings
 from app.database.session import get_db
 from app.payments import service
 from app.payments.schemas import PaymentCreate, PaymentRead, PaymentVerify, PaymentVerifyRequest
@@ -15,6 +16,7 @@ router = APIRouter(prefix="/payments", tags=["payments"])
 
 def _payment_payload(payment):
     item = PaymentRead.model_validate(payment).model_dump(mode="json")
+    item["razorpay_key_id"] = settings.razorpay_key_id
     return {
         "payment": item,
         "payment_id": item["id"],

@@ -27,7 +27,7 @@ def _razorpay_configured() -> bool:
 
 
 def _should_bypass_gateway() -> bool:
-    return settings.environment == "test"
+    return settings.environment.lower() == "test" and not _razorpay_configured()
 
 
 def _razorpay_client():

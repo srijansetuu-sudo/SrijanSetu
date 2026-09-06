@@ -251,11 +251,6 @@ export function OrderWorkspacePage() {
   const hasConfirmedCompletion = isCustomer ? Boolean(currentOrder.customer_completed_at) : isCreator ? Boolean(currentOrder.creator_completed_at) : false;
 
   const startRazorpayPayment = async ({ amount, paymentMethod, description }) => {
-    const razorpayKey = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
-    if (!razorpayKey) {
-      showFormValidationToast({ payment: { message: "Razorpay public key is not configured" } });
-      return;
-    }
     const loaded = await loadRazorpayCheckout();
     if (!loaded) {
       showFormValidationToast({ payment: { message: "Razorpay checkout could not be loaded" } });
@@ -263,6 +258,11 @@ export function OrderWorkspacePage() {
     }
     createPayment.mutate({ order_id: id, amount, payment_method: paymentMethod }, {
       onSuccess: (payment) => {
+        const razorpayKey = payment.razorpay_key_id || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
+        if (!razorpayKey) {
+          showFormValidationToast({ payment: { message: "Razorpay public key is not configured" } });
+          return;
+        }
         const checkout = new window.Razorpay({
           key: razorpayKey,
           amount: Math.round(Number(payment.amount) * 100),

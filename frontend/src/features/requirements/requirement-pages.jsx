@@ -431,11 +431,6 @@ export function RequirementQuotationsPage() {
   const hasLockedQuotation = quotations.some((quotation) => quotation.order_id);
 
   const openUpfrontCheckout = async (order, quotation) => {
-    const razorpayKey = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
-    if (!razorpayKey) {
-      showFormValidationToast({ payment: { message: "Razorpay public key is not configured" } });
-      return;
-    }
     const amount = Number(order.total_amount ?? quotation.proposed_price ?? 0);
     const loaded = await loadRazorpayCheckout();
     if (!loaded) {
@@ -444,6 +439,11 @@ export function RequirementQuotationsPage() {
     }
     createPayment.mutate({ order_id: order.id, amount, payment_method: "project_upfront" }, {
       onSuccess: (payment) => {
+        const razorpayKey = payment.razorpay_key_id || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
+        if (!razorpayKey) {
+          showFormValidationToast({ payment: { message: "Razorpay public key is not configured" } });
+          return;
+        }
         const checkout = new window.Razorpay({
           key: razorpayKey,
           amount: Math.round(Number(payment.amount) * 100),
