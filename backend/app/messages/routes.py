@@ -27,7 +27,12 @@ def _message_payload(message) -> dict:
 
 @router.post("", response_model=APIResponse)
 async def send_message(payload: MessageCreate, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_active_user)):
-    message = await service.send_message(db, user, payload)
+    message = await service.send_message(
+        db,
+        user,
+        payload,
+        skip_notification_user_ids=order_message_manager.active_user_ids(payload.order_id),
+    )
     item = _message_payload(message)
     await order_message_manager.broadcast(payload.order_id, {"type": "message", "message": item})
     return APIResponse(message="Message sent", data={"message": item})
@@ -72,7 +77,7 @@ async def order_messages_ws(websocket: WebSocket, order_id: UUID):
             return
 
         try:
-            await order_message_manager.connect(order_id, websocket)
+            await order_message_manager.connect(order_id, user.id, websocket)
             await websocket.send_json({"type": "connected", "order_id": str(order_id)})
             while True:
                 try:
@@ -106,6 +111,7 @@ async def order_messages_ws(websocket: WebSocket, order_id: UUID):
                         attachment_type=attachment_type,
                         attachment_name=attachment_name,
                     ),
+                    skip_notification_user_ids=order_message_manager.active_user_ids(order_id),
                 )
                 await order_message_manager.broadcast(order_id, {"type": "message", "message": _message_payload(message)})
         except WebSocketDisconnect:

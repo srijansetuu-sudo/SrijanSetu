@@ -195,7 +195,14 @@ export function OrderWorkspacePage() {
         } catch {
           return;
         }
-        if (payload.type === "message" && payload.message) appendMessage(payload.message);
+        if (payload.type === "connected") {
+          setChatStatus("live");
+          return;
+        }
+        if (payload.type === "message" && payload.message) {
+          setChatStatus("live");
+          appendMessage(payload.message);
+        }
       };
 
       socket.onclose = () => {
@@ -326,13 +333,13 @@ export function OrderWorkspacePage() {
                 </div>
                 <div className="mt-6 grid gap-2 sm:grid-cols-3">
                   {!isPendingActivation ? <RoleGuard roles={["CREATOR"]}>
-                    {currentOrder.status === "ACTIVE" ? <Button size="sm" variant="outline" onClick={() => updateStatus.mutate("DELIVERED")}>Mark delivered</Button> : null}
-                    {currentOrder.status === "DISPUTED" ? <Button size="sm" variant="outline" onClick={() => updateStatus.mutate("ACTIVE")}>Resume work</Button> : null}
-                    {["ACTIVE", "DELIVERED"].includes(currentOrder.status) ? <Button size="sm" variant="outline" onClick={() => updateStatus.mutate("DISPUTED")}>Raise dispute</Button> : null}
+                    {!hasConfirmedCompletion && currentOrder.status === "ACTIVE" ? <Button size="sm" variant="outline" onClick={() => updateStatus.mutate("DELIVERED")}>Mark delivered</Button> : null}
+                    {!hasConfirmedCompletion && currentOrder.status === "DISPUTED" ? <Button size="sm" variant="outline" onClick={() => updateStatus.mutate("ACTIVE")}>Resume work</Button> : null}
+                    {!hasConfirmedCompletion && ["ACTIVE", "DELIVERED"].includes(currentOrder.status) ? <Button size="sm" variant="outline" onClick={() => updateStatus.mutate("DISPUTED")}>Raise dispute</Button> : null}
                   </RoleGuard> : null}
-                  {!isPendingActivation && isDelivered && (isCustomer || isCreator) ? (
-                    <Button size="sm" variant="accent" disabled={confirmCompletion.isPending || hasConfirmedCompletion} onClick={() => confirmCompletion.mutate()}>
-                      {hasConfirmedCompletion ? "Completion confirmed" : "Confirm completion"}
+                  {!isPendingActivation && isDelivered && (isCustomer || isCreator) && !hasConfirmedCompletion ? (
+                    <Button size="sm" variant="accent" disabled={confirmCompletion.isPending} onClick={() => confirmCompletion.mutate()}>
+                      Confirm completion
                     </Button>
                   ) : null}
                   <RoleGuard roles={["CUSTOMER"]}>

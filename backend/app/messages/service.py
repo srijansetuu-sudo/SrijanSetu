@@ -24,7 +24,12 @@ async def _authorize_order(db: AsyncSession, user: User, order_id: UUID) -> Orde
     return order
 
 
-async def send_message(db: AsyncSession, user: User, payload: MessageCreate) -> Message:
+async def send_message(
+    db: AsyncSession,
+    user: User,
+    payload: MessageCreate,
+    skip_notification_user_ids: set[UUID] | None = None,
+) -> Message:
     order = await _authorize_order(db, user, payload.order_id)
     message = Message(
         order_id=payload.order_id,
@@ -35,7 +40,7 @@ async def send_message(db: AsyncSession, user: User, payload: MessageCreate) -> 
         attachment_name=payload.attachment_name,
     )
     db.add(message)
-    recipient_ids = {order.customer_id, order.creator_id} - {user.id}
+    recipient_ids = {order.customer_id, order.creator_id} - {user.id} - (skip_notification_user_ids or set())
     for recipient_id in recipient_ids:
         queue_notification(
             db,
