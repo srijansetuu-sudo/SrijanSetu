@@ -137,8 +137,13 @@ export function OrderWorkspacePage() {
   const [chatStatus, setChatStatus] = useState("connecting");
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
   const order = useApiQuery(queryKeys.order(id), () => orderService.details(id), { enabled: Boolean(id) });
-  const isPendingActivation = order.data?.status === "PENDING";
-  const messages = useApiQuery(queryKeys.messages(id), () => messageService.byOrder(id), { enabled: Boolean(id) && !isPendingActivation });
+  const orderStatus = order.data?.status;
+  const orderLoaded = Boolean(order.data?.id);
+  const isPendingActivation = orderStatus === "PENDING";
+  const messages = useApiQuery(queryKeys.messages(id), () => messageService.byOrder(id), {
+    enabled: Boolean(id) && !isPendingActivation,
+    refetchInterval: chatStatus === "live" ? false : 1500,
+  });
   const sendMessage = useApiMutation((payload) => messageService.create({ ...payload, order_id: id }), { invalidate: queryKeys.messages(id) });
   const updateStatus = useApiMutation((status) => orderService.updateStatus(id, status), { successMessage: "Status updated", invalidate: queryKeys.order(id) });
   const confirmCompletion = useApiMutation(() => orderService.confirmCompletion(id), { successMessage: "Completion confirmed", invalidate: [queryKeys.order(id), queryKeys.orders, queryKeys.myRequirements, queryKeys.payments] });
@@ -172,7 +177,7 @@ export function OrderWorkspacePage() {
   };
 
   useEffect(() => {
-    if (!id || !accessToken || isPendingActivation) return;
+    if (!id || !accessToken || order.isLoading || !orderLoaded || isPendingActivation) return;
 
     let stopped = false;
     let retryTimer = null;
@@ -217,6 +222,7 @@ export function OrderWorkspacePage() {
       };
 
       socket.onclose = () => {
+        if (socketRef.current === socket) socketRef.current = null;
         if (stopped) return;
         setChatStatus("reconnecting");
         const delay = Math.min(10000, 1000 * 2 ** retryAttempt);
@@ -237,7 +243,7 @@ export function OrderWorkspacePage() {
       socketRef.current?.close();
       socketRef.current = null;
     };
-  }, [accessToken, id, isPendingActivation, queryClient]);
+  }, [accessToken, id, isPendingActivation, order.isLoading, orderLoaded, queryClient]);
 
   useEffect(() => {
     messagesEnd.current?.scrollIntoView({ behavior: "smooth" });
