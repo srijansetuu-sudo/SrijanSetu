@@ -33,6 +33,9 @@ export default function AdminPayoutsPage() {
       <DashboardShell role="ADMIN">
         <div className="container-page py-10">
           <h1 className="text-3xl font-bold text-primary">Payouts</h1>
+          <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
+            When an order is completed, SrijanSetu emails the creator from the configured Gmail account asking them to reply with UPI or bank details. Watch the payout inbox, process the transfer manually, then record the transaction here.
+          </p>
           <div className="mt-6 grid gap-4">
             <Card>
               <CardContent>

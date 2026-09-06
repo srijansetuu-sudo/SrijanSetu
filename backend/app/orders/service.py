@@ -1,17 +1,88 @@
 from datetime import UTC, datetime
+from decimal import Decimal
+from email.message import EmailMessage
+import smtplib
 from uuid import UUID
 
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.config import settings
 from app.core.exceptions import APIError, ForbiddenError, NotFoundError
 from app.notifications.service import queue_notification
 from app.orders.models import Order, OrderFile, OrderStatus
 from app.orders.schemas import OrderFileCreate, OrderStatusUpdate
 from app.payments.models import Payment, PaymentStatus
 from app.requirements.models import RequirementStatus
-from app.users.models import User
+from app.users.models import User, UserRole
+
+
+def _money(value: Decimal) -> Decimal:
+    return Decimal(str(value)).quantize(Decimal("0.01"))
+
+
+def _creator_receivable(order: Order) -> Decimal:
+    return _money(order.total_amount) - _money(order.platform_commission)
+
+
+def _send_creator_payout_details_request(order: Order) -> bool:
+    if not settings.smtp_host or not settings.smtp_username or not settings.smtp_password or not order.creator or not order.creator.email:
+        return False
+
+    reply_email = settings.payout_reply_email or settings.contact_recipient_email
+    message = EmailMessage()
+    message["Subject"] = f"SrijanSetu payout details required for order {str(order.id)[:8]}"
+    message["From"] = settings.smtp_from_email or settings.smtp_username
+    message["To"] = order.creator.email
+    message["Reply-To"] = reply_email
+    message.set_content(
+        "\n".join(
+            [
+                f"Hi {order.creator.full_name},",
+                "",
+                "Your SrijanSetu order has been marked completed and your payout is ready for manual processing.",
+                "",
+                f"Order ID: {order.id}",
+                f"Total received: INR {_money(order.total_amount)}",
+                f"Platform commission: INR {_money(order.platform_commission)}",
+                f"Creator payout amount: INR {_creator_receivable(order)}",
+                "",
+                f"Please reply to this email with either your UPI ID or bank account details so the admin team can process your payout manually.",
+                "",
+                "For bank transfer, include:",
+                "Account holder name",
+                "Account number",
+                "IFSC code",
+                "Bank name",
+                "",
+                f"Replies should come back to {reply_email}.",
+                "",
+                "Thanks,",
+                "SrijanSetu",
+            ]
+        )
+    )
+
+    with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=10) as server:
+        server.starttls()
+        server.login(settings.smtp_username, settings.smtp_password)
+        server.send_message(message)
+    return True
+
+
+async def _queue_admin_payout_ready_notifications(db: AsyncSession, order: Order, email_sent: bool) -> None:
+    admin_ids = await db.scalars(select(User.id).where(User.role == UserRole.ADMIN, User.is_active.is_(True)))
+    reply_email = settings.payout_reply_email or settings.contact_recipient_email
+    status_text = "The creator has been emailed for UPI/bank details." if email_sent else "Creator payout email could not be sent because SMTP is not configured or failed."
+    for admin_id in admin_ids:
+        queue_notification(
+            db,
+            admin_id,
+            "Payout ready",
+            f"Order {order.id} is complete. {status_text} Watch {reply_email} and process the payout manually.",
+            "/dashboard/admin/payouts",
+        )
 
 
 async def _get_authorized_order(db: AsyncSession, user: User, order_id: UUID) -> Order:
@@ -125,6 +196,11 @@ async def confirm_completion(db: AsyncSession, user: User, order_id: UUID) -> Or
             order.requirement.status = RequirementStatus.COMPLETED
         title = "Project completed"
         body = "Both customer and creator confirmed completion. The creator payout is now ready after platform commission deduction."
+        try:
+            payout_email_sent = _send_creator_payout_details_request(order)
+        except Exception:
+            payout_email_sent = False
+        await _queue_admin_payout_ready_notifications(db, order, payout_email_sent)
 
     queue_notification(db, recipient_id, title, body, f"/orders/{order.id}")
     await db.commit()
