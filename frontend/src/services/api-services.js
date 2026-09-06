@@ -108,4 +108,6 @@ export const reviewService = {
 export const notificationService = {
   list: () => data(api.get("/notifications")),
   read: (id) => pick(api.patch(`/notifications/${id}/read`), "notification"),
+  markAllRead: () => data(api.patch("/notifications/read-all")),
+  bulkUpdate: (payload) => data(api.patch("/notifications/bulk", body(payload))),
 };

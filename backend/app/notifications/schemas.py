@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class NotificationRead(BaseModel):
@@ -15,3 +15,8 @@ class NotificationRead(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class NotificationBulkUpdate(BaseModel):
+    ids: list[UUID] = Field(default_factory=list)
+    is_read: bool

@@ -44,3 +44,32 @@ async def mark_read(db: AsyncSession, user: User, notification_id: UUID) -> Noti
     await db.commit()
     await db.refresh(notification)
     return notification
+
+
+async def update_notifications_read_state(db: AsyncSession, user: User, notification_ids: list[UUID], is_read: bool) -> list[Notification]:
+    if not notification_ids:
+        return []
+    result = await db.scalars(
+        select(Notification).where(
+            Notification.user_id == user.id,
+            Notification.id.in_(notification_ids),
+        )
+    )
+    notifications = list(result)
+    for notification in notifications:
+        notification.is_read = is_read
+    await db.commit()
+    for notification in notifications:
+        await db.refresh(notification)
+    return notifications
+
+
+async def mark_all_read(db: AsyncSession, user: User) -> list[Notification]:
+    result = await db.scalars(select(Notification).where(Notification.user_id == user.id, Notification.is_read.is_(False)))
+    notifications = list(result)
+    for notification in notifications:
+        notification.is_read = True
+    await db.commit()
+    for notification in notifications:
+        await db.refresh(notification)
+    return notifications
