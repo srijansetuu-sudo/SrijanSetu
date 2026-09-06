@@ -16,6 +16,7 @@ export default function AdminPayoutsPage() {
   const orderQuery = useApiQuery(queryKeys.order(orderId), () => orderService.details(orderId), { enabled: Boolean(orderId) });
   const orderPayoutQuery = useApiQuery(queryKeys.adminOrderPayout(orderId), () => adminService.orderPayout(orderId), { enabled: Boolean(orderId) });
   const createPayout = useApiMutation((payload) => adminService.createOrderPayout(orderId, payload), { successMessage: "Payout recorded", invalidate: [queryKeys.adminPayouts, queryKeys.order(orderId), queryKeys.adminOrderPayout(orderId)] });
+  const requestPayoutDetails = useApiMutation(() => adminService.requestPayoutDetails(orderId), { successMessage: "Payout details email sent" });
   const [transactionId, setTransactionId] = useReactState("");
   const [paymentMethod, setPaymentMethod] = useReactState("UPI");
   const [remarks, setRemarks] = useReactState("");
@@ -54,6 +55,9 @@ export default function AdminPayoutsPage() {
                   <p>Total amount: ₹{orderQuery.data.total_amount}</p>
                   <p>Platform commission: ₹{orderQuery.data.platform_commission}</p>
                   <p>Creator receivable: ₹{(Number(orderQuery.data.total_amount) - Number(orderQuery.data.platform_commission)).toFixed(2)}</p>
+                  <Button className="mt-4" variant="outline" disabled={requestPayoutDetails.isPending || orderQuery.data.status !== "COMPLETED" || !orderQuery.data.payout_ready_at} onClick={() => requestPayoutDetails.mutate()}>
+                    Send payout details email
+                  </Button>
                 </CardContent>
               </Card>
             ) : null}

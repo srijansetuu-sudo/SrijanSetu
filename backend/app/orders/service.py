@@ -85,6 +85,19 @@ async def _queue_admin_payout_ready_notifications(db: AsyncSession, order: Order
         )
 
 
+async def request_creator_payout_details(db: AsyncSession, order_id: UUID) -> bool:
+    order = await db.scalar(
+        select(Order)
+        .options(selectinload(Order.creator))
+        .where(Order.id == order_id)
+    )
+    if not order:
+        raise NotFoundError("Order not found")
+    if order.status != OrderStatus.COMPLETED or not order.payout_ready_at:
+        raise APIError("Payout details can be requested only after the order is completed")
+    return _send_creator_payout_details_request(order)
+
+
 async def _get_authorized_order(db: AsyncSession, user: User, order_id: UUID) -> Order:
     order = await db.scalar(
         select(Order)

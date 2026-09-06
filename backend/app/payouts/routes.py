@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.dependencies import require_admin
 from app.database.session import get_db
 # APIResponse not required here; keep routes minimal
+from app.orders import service as order_service
 from app.payouts import service
 from app.payouts import schemas
 from app.users.models import User
@@ -39,6 +40,14 @@ async def get_payout_for_order(order_id: UUID, db: AsyncSession = Depends(get_db
     if not payout:
         return {"success": False, "message": "Payout not found", "data": {}}
     return {"success": True, "data": {"payout": schemas.PayoutRead.model_validate(payout).model_dump(mode="json")}}
+
+
+@router.post("/orders/{order_id}/request-payout-details")
+async def request_payout_details(order_id: UUID, db: AsyncSession = Depends(get_db), user: User = Depends(require_admin)):
+    email_sent = await order_service.request_creator_payout_details(db, order_id)
+    if not email_sent:
+        return {"success": False, "message": "Payout email was not sent. Check SMTP settings and creator email address.", "data": {}}
+    return {"success": True, "message": "Payout details email sent", "data": {"email_sent": True}}
 
 
 @router.patch("/payouts/{payout_id}")
