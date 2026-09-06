@@ -392,7 +392,6 @@ export function OrderWorkspacePage() {
                   <h2 className="text-xl font-bold text-primary">Chat with {creatorName}</h2>
                   <p className="mt-1 text-sm text-muted-foreground">Messages, images, and links stay with this workspace.</p>
                 </div>
-                <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold uppercase text-primary">{chatStatus}</span>
               </div>
               <div className="mt-4 max-h-[520px] overflow-y-auto rounded-lg bg-muted p-4">
                 {asArray(messages.data).length ? asArray(messages.data).map((message) => {
