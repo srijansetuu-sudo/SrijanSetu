@@ -38,12 +38,8 @@ const disputeSchema = z.object({
   evidence_name: z.string().optional(),
 });
 const disputeResolutionSchema = z.object({
-  status: z.string().min(1),
-  resolution: z.string().optional(),
+  action: z.string().min(1),
   admin_note: z.string().optional(),
-}).refine((values) => values.status !== "RESOLVED" || values.resolution, {
-  message: "Resolution is required",
-  path: ["resolution"],
 });
 const DISPUTE_REASONS = [
   ["QUALITY_ISSUE", "Quality issue"],
@@ -54,6 +50,7 @@ const DISPUTE_REASONS = [
   ["OTHER", "Other"],
 ];
 const DISPUTE_RESOLUTIONS = [
+  ["IN_REVIEW", "In review"],
   ["RESUME_ORDER", "Resume order"],
   ["CANCEL_ORDER", "Cancel order"],
   ["OTHER", "Other"],
@@ -164,20 +161,20 @@ function DisputeResolutionCard({ dispute, orderId }) {
   const form = useForm({
     resolver: zodResolver(disputeResolutionSchema),
     defaultValues: {
-      status: dispute.status === "RESOLVED" ? "RESOLVED" : "IN_REVIEW",
-      resolution: dispute.resolution || "RESUME_ORDER",
+      action: dispute.status === "RESOLVED" ? dispute.resolution || "RESUME_ORDER" : dispute.resolution === "OTHER" ? "OTHER" : "IN_REVIEW",
       admin_note: dispute.admin_note || "",
     },
   });
 
-  const submit = (values) => updateDispute.mutate({
-    id: dispute.id,
-    payload: {
-      status: values.status,
-      resolution: values.status === "RESOLVED" ? values.resolution : undefined,
+  const submit = (values) => {
+    const action = values.action;
+    const payload = {
+      status: action === "RESUME_ORDER" || action === "CANCEL_ORDER" ? "RESOLVED" : "IN_REVIEW",
+      resolution: action === "RESUME_ORDER" || action === "CANCEL_ORDER" || action === "OTHER" ? action : undefined,
       admin_note: values.admin_note?.trim() || undefined,
-    },
-  });
+    };
+    updateDispute.mutate({ id: dispute.id, payload });
+  };
 
   return (
     <div className="rounded-lg border border-border bg-white p-4">
@@ -196,16 +193,12 @@ function DisputeResolutionCard({ dispute, orderId }) {
       ) : null}
       {dispute.admin_note ? <p className="mt-3 rounded-lg bg-muted p-3 text-sm text-muted-foreground"><span className="font-semibold text-primary">Admin note:</span> {dispute.admin_note}</p> : null}
       {dispute.status !== "RESOLVED" ? (
-        <form className="mt-4 grid gap-3 md:grid-cols-3" onSubmit={form.handleSubmit(submit, showFormValidationToast)}>
-          <select className="h-11 rounded-lg border border-border bg-white px-3 text-sm font-semibold text-primary" {...form.register("status")}>
-            <option value="IN_REVIEW">In review</option>
-            <option value="RESOLVED">Resolved</option>
-          </select>
-          <select className="h-11 rounded-lg border border-border bg-white px-3 text-sm font-semibold text-primary" {...form.register("resolution")}>
+        <form className="mt-4 grid gap-3" onSubmit={form.handleSubmit(submit, showFormValidationToast)}>
+          <select className="h-11 rounded-lg border border-border bg-white px-3 text-sm font-semibold text-primary" {...form.register("action")}>
             {DISPUTE_RESOLUTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
-          <Textarea className="md:col-span-3" placeholder="Admin note for both parties" {...form.register("admin_note")} />
-          <Button className="md:col-span-3" disabled={updateDispute.isPending}>Update dispute</Button>
+          <Textarea placeholder="Admin note for both parties" {...form.register("admin_note")} />
+          <Button disabled={updateDispute.isPending}>Update dispute</Button>
         </form>
       ) : (
         <p className="mt-3 text-sm font-semibold text-primary">Resolution: {DISPUTE_RESOLUTIONS.find(([value]) => value === dispute.resolution)?.[1] || dispute.resolution}</p>
@@ -569,7 +562,7 @@ export function OrderWorkspacePage() {
                         <p className="mt-3 whitespace-pre-wrap text-sm text-muted-foreground">{dispute.details}</p>
                         {dispute.evidence_url ? <a href={dispute.evidence_url} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline"><Paperclip className="h-4 w-4" />{dispute.evidence_name || "View evidence"}</a> : null}
                         {dispute.admin_note ? <p className="mt-3 rounded-lg bg-muted p-3 text-sm text-muted-foreground"><span className="font-semibold text-primary">Admin note:</span> {dispute.admin_note}</p> : null}
-                        {dispute.resolution ? <p className="mt-3 text-sm font-semibold text-primary">Resolution: {DISPUTE_RESOLUTIONS.find(([value]) => value === dispute.resolution)?.[1] || dispute.resolution}</p> : null}
+                        {dispute.status === "RESOLVED" && dispute.resolution ? <p className="mt-3 text-sm font-semibold text-primary">Resolution: {DISPUTE_RESOLUTIONS.find(([value]) => value === dispute.resolution)?.[1] || dispute.resolution}</p> : null}
                       </div>
                     )
                   ))}

@@ -258,6 +258,10 @@ async def update_dispute(db: AsyncSession, admin: User, dispute_id: UUID, payloa
         dispute.status = values["status"]
     if "resolution" in values and values["resolution"] is not None:
         dispute.resolution = values["resolution"]
+        if dispute.resolution in {DisputeResolution.RESUME_ORDER, DisputeResolution.CANCEL_ORDER}:
+            dispute.status = DisputeStatus.RESOLVED
+        elif dispute.resolution == DisputeResolution.OTHER and "status" not in values:
+            dispute.status = DisputeStatus.IN_REVIEW
 
     if dispute.status == DisputeStatus.RESOLVED:
         if not dispute.resolution:
