@@ -15,6 +15,7 @@ from app.disputes.models import Dispute, DisputeResolution, DisputeStatus
 from app.disputes.schemas import DisputeCreate, DisputeUpdate
 from app.notifications.service import queue_notification
 from app.orders.models import Order, OrderStatus
+from app.quotations.models import Quotation, QuotationStatus
 from app.requirements.models import RequirementStatus
 from app.users.models import User, UserRole
 
@@ -192,14 +193,14 @@ async def create_dispute(db: AsyncSession, user: User, order_id: UUID, payload: 
         db,
         other_party_id,
         "Order dispute raised",
-        f"{_participant_name(user, 'The other party')} raised a dispute. Admin has been notified; please keep communication in the workspace chat.",
+        f"{_participant_name(user, 'The other party')} raised a dispute. The workspace is paused while admin reviews it. For further queries, email {settings.contact_recipient_email}.",
         f"/orders/{order.id}",
     )
     queue_notification(
         db,
         user.id,
         "Dispute sent to admin",
-        "Your dispute has been sent to the admin inbox. Please keep communication and evidence in the workspace.",
+        f"Your dispute has been sent to the admin inbox. The workspace is paused while admin reviews it. For further queries, email {settings.contact_recipient_email}.",
         f"/orders/{order.id}",
     )
     try:
@@ -269,9 +270,11 @@ async def update_dispute(db: AsyncSession, admin: User, dispute_id: UUID, payloa
             if dispute.order.requirement:
                 dispute.order.requirement.status = RequirementStatus.IN_PROGRESS
         elif dispute.resolution == DisputeResolution.CANCEL_ORDER:
-            dispute.order.status = OrderStatus.CANCELLED
             if dispute.order.requirement:
-                dispute.order.requirement.status = RequirementStatus.CANCELLED
+                dispute.order.requirement.status = RequirementStatus.OPEN
+            quotation = await db.get(Quotation, dispute.order.quotation_id)
+            if quotation and quotation.status == QuotationStatus.ACCEPTED:
+                quotation.status = QuotationStatus.REJECTED
 
     elif dispute.status == DisputeStatus.IN_REVIEW:
         pass
@@ -286,15 +289,22 @@ async def update_dispute(db: AsyncSession, admin: User, dispute_id: UUID, payloa
             if dispute.admin_note:
                 submission.admin_note = dispute.admin_note
 
-    participant_ids = [dispute.order.customer_id, dispute.order.creator_id]
+    order = dispute.order
+    participant_ids = [order.customer_id, order.creator_id]
     for participant_id in participant_ids:
         queue_notification(
             db,
             participant_id,
             "Dispute updated",
-            f"Admin updated the dispute status to {dispute.status.value}.",
-            f"/orders/{dispute.order_id}",
+            f"Admin updated the dispute status to {dispute.status.value}. For further queries, email {settings.contact_recipient_email}.",
+            f"/orders/{order.id}" if dispute.resolution != DisputeResolution.CANCEL_ORDER else f"/requirements/{order.requirement_id}",
         )
+
+    if dispute.status == DisputeStatus.RESOLVED and dispute.resolution == DisputeResolution.CANCEL_ORDER:
+        cancelled_payload = dispute_payload(dispute)
+        await db.delete(order)
+        await db.commit()
+        return cancelled_payload
 
     await db.commit()
     return await get_dispute(db, admin, dispute.id)

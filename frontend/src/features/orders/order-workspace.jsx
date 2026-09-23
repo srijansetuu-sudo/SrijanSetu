@@ -58,6 +58,7 @@ const DISPUTE_RESOLUTIONS = [
   ["CANCEL_ORDER", "Cancel order"],
   ["OTHER", "Other"],
 ];
+const SUPPORT_EMAIL = "srijan.setuu@gmail.com";
 const RAZORPAY_CHECKOUT_SRC = "https://checkout.razorpay.com/v1/checkout.js";
 const RAZORPAY_UPI_DISPLAY_CONFIG = {
   display: {
@@ -227,9 +228,10 @@ export function OrderWorkspacePage() {
   const orderStatus = order.data?.status;
   const orderLoaded = Boolean(order.data?.id);
   const isPendingActivation = orderStatus === "PENDING";
+  const isWorkspacePaused = orderStatus === "DISPUTED";
   const disputes = useApiQuery(queryKeys.orderDisputes(id), () => disputeService.byOrder(id), { enabled: Boolean(id) && orderLoaded && !isPendingActivation });
   const messages = useApiQuery(queryKeys.messages(id), () => messageService.byOrder(id), {
-    enabled: Boolean(id) && !isPendingActivation,
+    enabled: Boolean(id) && !isPendingActivation && !isWorkspacePaused,
     refetchInterval: chatStatus === "live" ? false : 1500,
   });
   const sendMessage = useApiMutation((payload) => messageService.create({ ...payload, order_id: id }), { invalidate: queryKeys.messages(id) });
@@ -290,7 +292,7 @@ export function OrderWorkspacePage() {
   };
 
   useEffect(() => {
-    if (!id || !accessToken || order.isLoading || !orderLoaded || isPendingActivation) return;
+    if (!id || !accessToken || order.isLoading || !orderLoaded || isPendingActivation || isWorkspacePaused) return;
 
     let stopped = false;
     let retryTimer = null;
@@ -356,7 +358,7 @@ export function OrderWorkspacePage() {
       socketRef.current?.close();
       socketRef.current = null;
     };
-  }, [accessToken, id, isPendingActivation, order.isLoading, orderLoaded, queryClient]);
+  }, [accessToken, id, isPendingActivation, isWorkspacePaused, order.isLoading, orderLoaded, queryClient]);
 
   useEffect(() => {
     messagesEnd.current?.scrollIntoView({ behavior: "smooth" });
@@ -505,7 +507,7 @@ export function OrderWorkspacePage() {
                   <div className="mt-6 rounded-lg border border-border bg-muted/60 p-4 text-sm text-muted-foreground">
                     <p className="font-semibold text-primary">Delivery and payout</p>
                     <p className="mt-1">SrijanSetu currently does not support delivery logistics. Customer and creator must coordinate delivery directly; delivery support is planned for a future release.</p>
-                    <p className="mt-1">The customer payment stays with SrijanSetu while work is in progress. After the creator marks the project delivered and both customer and creator confirm completion, creator payout becomes ready after platform commission deduction.</p>
+                    <p className="mt-1">{isWorkspacePaused ? `This workspace is paused while admin reviews the dispute. For further queries, email ${SUPPORT_EMAIL}.` : "The customer payment stays with SrijanSetu while work is in progress. After the creator marks the project delivered and both customer and creator confirm completion, creator payout becomes ready after platform commission deduction."}</p>
                     <p className="mt-1 font-semibold text-primary">Creator payout after commission: {money(currentOrder.creator_payout_amount)}</p>
                     {isDelivered ? <p className="mt-1 font-semibold text-primary">Customer confirmation: {currentOrder.customer_completed_at ? "done" : "pending"} · Creator confirmation: {currentOrder.creator_completed_at ? "done" : "pending"}</p> : null}
                     {isCompleted ? <p className="mt-1 font-semibold text-primary">Project completed. Creator payout is ready after commission deduction.</p> : null}
@@ -576,7 +578,22 @@ export function OrderWorkspacePage() {
             </Card>
           ) : null}
 
-          {!isPendingActivation ? <Card>
+          {isWorkspacePaused ? (
+            <Card>
+              <CardContent>
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="mt-1 h-5 w-5 shrink-0 text-primary" />
+                  <div>
+                    <h2 className="text-xl font-bold text-primary">Workspace paused</h2>
+                    <p className="mt-2 text-sm text-muted-foreground">Admin is reviewing this dispute. Work, chat, completion, and payout actions are paused until admin resumes the order.</p>
+                    <p className="mt-2 text-sm font-semibold text-primary">For further queries, email {SUPPORT_EMAIL}.</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {!isPendingActivation && !isWorkspacePaused ? <Card>
             <CardContent>
               <div className="flex items-center justify-between gap-3">
                 <div>

@@ -28,5 +28,5 @@ async def list_order_disputes(order_id: UUID, db: AsyncSession = Depends(get_db)
 @router.patch("/admin/disputes/{dispute_id}", response_model=APIResponse)
 async def update_dispute(dispute_id: UUID, payload: DisputeUpdate, db: AsyncSession = Depends(get_db), user: User = Depends(require_admin)):
     dispute = await service.update_dispute(db, user, dispute_id, payload)
-    return APIResponse(message="Dispute updated", data={"dispute": service.dispute_payload(dispute)})
-
+    item = dispute if isinstance(dispute, dict) else service.dispute_payload(dispute)
+    return APIResponse(message="Dispute updated", data={"dispute": item})

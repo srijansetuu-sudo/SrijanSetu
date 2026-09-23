@@ -21,6 +21,8 @@ async def _authorize_order(db: AsyncSession, user: User, order_id: UUID) -> Orde
         raise ForbiddenError("You cannot access messages for this order")
     if order.status == OrderStatus.PENDING:
         raise APIError("Workspace messages unlock after the customer pays the full quoted amount upfront")
+    if order.status == OrderStatus.DISPUTED:
+        raise APIError("Workspace is paused while admin reviews the dispute")
     return order
 
 
