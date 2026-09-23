@@ -397,7 +397,7 @@ export function OrderWorkspacePage() {
   const isCreator = user?.id === currentOrder.creator_id;
   const isAdmin = user?.role === "ADMIN";
   const hasConfirmedCompletion = isCustomer ? Boolean(currentOrder.customer_completed_at) : isCreator ? Boolean(currentOrder.creator_completed_at) : false;
-  const canRaiseDispute = !hasConfirmedCompletion && (isCustomer || isCreator) && ["ACTIVE", "DELIVERED"].includes(currentOrder.status);
+  const canRaiseDispute = (isCustomer || isCreator) && ["ACTIVE", "DELIVERED"].includes(currentOrder.status);
   const disputeItems = asArray(disputes.data);
 
   const startRazorpayPayment = async ({ amount, paymentMethod, description }) => {
