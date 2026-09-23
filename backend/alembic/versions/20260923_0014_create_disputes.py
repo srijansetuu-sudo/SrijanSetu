@@ -40,18 +40,22 @@ def upgrade() -> None:
     status_enum.create(bind, checkfirst=True)
     resolution_enum.create(bind, checkfirst=True)
 
+    existing_reason_enum = postgresql.ENUM(name="disputereason", create_type=False)
+    existing_status_enum = postgresql.ENUM(name="disputestatus", create_type=False)
+    existing_resolution_enum = postgresql.ENUM(name="disputeresolution", create_type=False)
+
     op.create_table(
         "disputes",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
         sa.Column("order_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("orders.id", ondelete="CASCADE"), nullable=False),
         sa.Column("raised_by", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
-        sa.Column("reason", reason_enum, nullable=False),
+        sa.Column("reason", existing_reason_enum, nullable=False),
         sa.Column("details", sa.Text(), nullable=False),
         sa.Column("evidence_url", sa.Text(), nullable=True),
         sa.Column("evidence_name", sa.String(length=255), nullable=True),
-        sa.Column("status", status_enum, nullable=False, server_default="OPEN"),
+        sa.Column("status", existing_status_enum, nullable=False, server_default="OPEN"),
         sa.Column("admin_note", sa.Text(), nullable=True),
-        sa.Column("resolution", resolution_enum, nullable=True),
+        sa.Column("resolution", existing_resolution_enum, nullable=True),
         sa.Column("resolved_by", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
         sa.Column("resolved_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("contact_submission_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("contact_submissions.id", ondelete="SET NULL"), nullable=True),
