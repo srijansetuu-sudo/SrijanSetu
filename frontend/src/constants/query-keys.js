@@ -11,6 +11,7 @@ export const queryKeys = {
   myQuotations: ["quotations", "my"],
   orders: ["orders"],
   order: (id) => ["order", id],
+  orderDisputes: (id) => ["order", id, "disputes"],
   orderFiles: (id) => ["order", id, "files"],
   messages: (id) => ["messages", id],
   payments: ["payments", "history"],

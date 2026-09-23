@@ -74,6 +74,12 @@ export const orderService = {
   uploadFile: (id, payload) => pick(api.post(`/orders/${id}/files`, body(payload)), "file"),
 };
 
+export const disputeService = {
+  create: (orderId, payload) => pick(api.post(`/orders/${orderId}/disputes`, body(payload)), "dispute"),
+  byOrder: (orderId) => data(api.get(`/orders/${orderId}/disputes`)),
+  adminUpdate: (id, payload) => pick(api.patch(`/admin/disputes/${id}`, body(payload)), "dispute"),
+};
+
 export const contactService = {
   create: (payload) => pick(api.post("/contact", body(payload)), "submission"),
   adminList: (params) => data(api.get("/contact/admin", { params })),

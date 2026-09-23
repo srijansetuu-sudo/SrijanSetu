@@ -4,6 +4,7 @@ from app.auth.routes import router as auth_router
 from app.admin.routes import router as admin_router
 from app.contact.routes import router as contact_router
 from app.creators.routes import router as creators_router
+from app.disputes.routes import router as disputes_router
 from app.messages.routes import router as messages_router
 from app.notifications.routes import router as notifications_router
 from app.orders.routes import router as orders_router
@@ -24,6 +25,7 @@ api_router.include_router(creators_router)
 api_router.include_router(requirements_router)
 api_router.include_router(quotations_router)
 api_router.include_router(orders_router)
+api_router.include_router(disputes_router)
 api_router.include_router(messages_router)
 api_router.include_router(payments_router)
 api_router.include_router(payouts_router)

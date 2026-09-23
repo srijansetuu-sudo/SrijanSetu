@@ -7,6 +7,11 @@ CREATE TYPE requirementstatus AS ENUM ('OPEN', 'IN_PROGRESS', 'COMPLETED', 'CANC
 CREATE TYPE quotationstatus AS ENUM ('PENDING', 'ACCEPTED', 'REJECTED', 'WITHDRAWN');
 CREATE TYPE orderstatus AS ENUM ('PENDING', 'ACTIVE', 'DELIVERED', 'COMPLETED', 'CANCELLED', 'DISPUTED');
 CREATE TYPE paymentstatus AS ENUM ('PENDING', 'SUCCESS', 'FAILED', 'REFUNDED');
+CREATE TYPE disputereason AS ENUM ('QUALITY_ISSUE', 'MISSED_DEADLINE', 'INCOMPLETE_DELIVERY', 'PAYMENT_OR_REFUND', 'COMMUNICATION_ISSUE', 'OTHER');
+CREATE TYPE disputestatus AS ENUM ('OPEN', 'IN_REVIEW', 'RESOLVED');
+CREATE TYPE disputeresolution AS ENUM ('RESUME_ORDER', 'CANCEL_ORDER', 'HOLD_PAYOUT', 'RELEASE_PAYOUT', 'REFUND_REVIEW', 'OTHER');
+CREATE TYPE contactcategory AS ENUM ('FEEDBACK', 'ORDER_COMPLAINT', 'QUERY');
+CREATE TYPE contactstatus AS ENUM ('OPEN', 'IN_REVIEW', 'RESOLVED');
 
 CREATE TABLE users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -156,6 +161,39 @@ CREATE TABLE notifications (
   body TEXT NOT NULL,
   action_url VARCHAR(255),
   is_read BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE contact_submissions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  order_id UUID REFERENCES orders(id) ON DELETE SET NULL,
+  category contactcategory NOT NULL,
+  status contactstatus NOT NULL DEFAULT 'OPEN',
+  name VARCHAR(120) NOT NULL,
+  email VARCHAR(255) NOT NULL,
+  subject VARCHAR(180) NOT NULL,
+  message TEXT NOT NULL,
+  admin_note TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE disputes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  raised_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  reason disputereason NOT NULL,
+  details TEXT NOT NULL,
+  evidence_url TEXT,
+  evidence_name VARCHAR(255),
+  status disputestatus NOT NULL DEFAULT 'OPEN',
+  admin_note TEXT,
+  resolution disputeresolution,
+  resolved_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  resolved_at TIMESTAMPTZ,
+  contact_submission_id UUID REFERENCES contact_submissions(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

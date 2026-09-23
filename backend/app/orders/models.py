@@ -43,6 +43,7 @@ class Order(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     messages = relationship("Message", back_populates="order", cascade="all, delete-orphan")
     payments = relationship("Payment", back_populates="order", cascade="all, delete-orphan")
     review = relationship("Review", back_populates="order", uselist=False)
+    disputes = relationship("Dispute", back_populates="order", cascade="all, delete-orphan")
 
 
 class OrderFile(Base, UUIDPrimaryKeyMixin, TimestampMixin):

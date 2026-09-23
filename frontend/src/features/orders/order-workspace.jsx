@@ -7,7 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { ExternalLink, FileText, LinkIcon, Paperclip, Send, UserCircle } from "lucide-react";
+import { AlertTriangle, ExternalLink, FileText, LinkIcon, Paperclip, Send, UserCircle } from "lucide-react";
 import { Navbar } from "@/components/layout/navbar";
 import { ProtectedRoute, RoleGuard } from "@/components/common/protected-route";
 import { EmptyState, LoadingState } from "@/components/common/states";
@@ -18,7 +18,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { showFormValidationToast, useApiMutation, useApiQuery } from "@/hooks/use-api";
 import { queryKeys } from "@/constants/query-keys";
-import { messageService, orderService, paymentService, reviewService, uploadService } from "@/services/api-services";
+import { disputeService, messageService, orderService, paymentService, reviewService, uploadService } from "@/services/api-services";
 import { asArray, dateLabel, money } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth-store";
 
@@ -31,6 +31,36 @@ const messageSchema = z.object({
   path: ["message"],
 });
 const reviewSchema = z.object({ rating: z.coerce.number().min(1).max(5), comment: z.string().optional() });
+const disputeSchema = z.object({
+  reason: z.string().min(1, "Reason is required"),
+  details: z.string().min(10, "Please add at least 10 characters").max(3000),
+  evidence_url: z.string().optional(),
+  evidence_name: z.string().optional(),
+});
+const disputeResolutionSchema = z.object({
+  status: z.string().min(1),
+  resolution: z.string().optional(),
+  admin_note: z.string().optional(),
+}).refine((values) => values.status !== "RESOLVED" || values.resolution, {
+  message: "Resolution is required",
+  path: ["resolution"],
+});
+const DISPUTE_REASONS = [
+  ["QUALITY_ISSUE", "Quality issue"],
+  ["MISSED_DEADLINE", "Missed deadline"],
+  ["INCOMPLETE_DELIVERY", "Incomplete delivery"],
+  ["PAYMENT_OR_REFUND", "Payment or refund"],
+  ["COMMUNICATION_ISSUE", "Communication issue"],
+  ["OTHER", "Other"],
+];
+const DISPUTE_RESOLUTIONS = [
+  ["RESUME_ORDER", "Resume order"],
+  ["CANCEL_ORDER", "Cancel order"],
+  ["HOLD_PAYOUT", "Hold payout"],
+  ["RELEASE_PAYOUT", "Release payout"],
+  ["REFUND_REVIEW", "Refund review"],
+  ["OTHER", "Other"],
+];
 const RAZORPAY_CHECKOUT_SRC = "https://checkout.razorpay.com/v1/checkout.js";
 const RAZORPAY_UPI_DISPLAY_CONFIG = {
   display: {
@@ -128,6 +158,64 @@ function AttachmentPreview({ message }) {
   );
 }
 
+function DisputeResolutionCard({ dispute, orderId }) {
+  const updateDispute = useApiMutation(({ id, payload }) => disputeService.adminUpdate(id, payload), {
+    successMessage: "Dispute updated",
+    invalidate: [queryKeys.order(orderId), queryKeys.orderDisputes(orderId), queryKeys.contactSubmissions, queryKeys.adminStats],
+  });
+  const form = useForm({
+    resolver: zodResolver(disputeResolutionSchema),
+    defaultValues: {
+      status: dispute.status === "RESOLVED" ? "RESOLVED" : "IN_REVIEW",
+      resolution: dispute.resolution || "RESUME_ORDER",
+      admin_note: dispute.admin_note || "",
+    },
+  });
+
+  const submit = (values) => updateDispute.mutate({
+    id: dispute.id,
+    payload: {
+      status: values.status,
+      resolution: values.status === "RESOLVED" ? values.resolution : undefined,
+      admin_note: values.admin_note?.trim() || undefined,
+    },
+  });
+
+  return (
+    <div className="rounded-lg border border-border bg-white p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="font-bold text-primary">{DISPUTE_REASONS.find(([value]) => value === dispute.reason)?.[1] || dispute.reason}</p>
+          <p className="mt-1 text-sm text-muted-foreground">Raised by {dispute.raised_by_name || "User"} on {dateLabel(dispute.created_at)}</p>
+        </div>
+        <Badge variant="primary">{dispute.status}</Badge>
+      </div>
+      <p className="mt-3 whitespace-pre-wrap text-sm text-muted-foreground">{dispute.details}</p>
+      {dispute.evidence_url ? (
+        <a href={dispute.evidence_url} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline">
+          <Paperclip className="h-4 w-4" />{dispute.evidence_name || "View evidence"}
+        </a>
+      ) : null}
+      {dispute.admin_note ? <p className="mt-3 rounded-lg bg-muted p-3 text-sm text-muted-foreground"><span className="font-semibold text-primary">Admin note:</span> {dispute.admin_note}</p> : null}
+      {dispute.status !== "RESOLVED" ? (
+        <form className="mt-4 grid gap-3 md:grid-cols-3" onSubmit={form.handleSubmit(submit, showFormValidationToast)}>
+          <select className="h-11 rounded-lg border border-border bg-white px-3 text-sm font-semibold text-primary" {...form.register("status")}>
+            <option value="IN_REVIEW">In review</option>
+            <option value="RESOLVED">Resolved</option>
+          </select>
+          <select className="h-11 rounded-lg border border-border bg-white px-3 text-sm font-semibold text-primary" {...form.register("resolution")}>
+            {DISPUTE_RESOLUTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+          <Textarea className="md:col-span-3" placeholder="Admin note for both parties" {...form.register("admin_note")} />
+          <Button className="md:col-span-3" disabled={updateDispute.isPending}>Update dispute</Button>
+        </form>
+      ) : (
+        <p className="mt-3 text-sm font-semibold text-primary">Resolution: {DISPUTE_RESOLUTIONS.find(([value]) => value === dispute.resolution)?.[1] || dispute.resolution}</p>
+      )}
+    </div>
+  );
+}
+
 export function OrderWorkspacePage() {
   const { id } = useParams();
   const queryClient = useQueryClient();
@@ -136,24 +224,31 @@ export function OrderWorkspacePage() {
   const socketRef = useRef(null);
   const [chatStatus, setChatStatus] = useState("connecting");
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
+  const [isDisputeOpen, setIsDisputeOpen] = useState(false);
+  const [isUploadingEvidence, setIsUploadingEvidence] = useState(false);
   const order = useApiQuery(queryKeys.order(id), () => orderService.details(id), { enabled: Boolean(id) });
   const orderStatus = order.data?.status;
   const orderLoaded = Boolean(order.data?.id);
   const isPendingActivation = orderStatus === "PENDING";
+  const disputes = useApiQuery(queryKeys.orderDisputes(id), () => disputeService.byOrder(id), { enabled: Boolean(id) && orderLoaded && !isPendingActivation });
   const messages = useApiQuery(queryKeys.messages(id), () => messageService.byOrder(id), {
     enabled: Boolean(id) && !isPendingActivation,
     refetchInterval: chatStatus === "live" ? false : 1500,
   });
   const sendMessage = useApiMutation((payload) => messageService.create({ ...payload, order_id: id }), { invalidate: queryKeys.messages(id) });
   const updateStatus = useApiMutation((status) => orderService.updateStatus(id, status), { successMessage: "Status updated", invalidate: queryKeys.order(id) });
+  const createDispute = useApiMutation((payload) => disputeService.create(id, payload), { successMessage: "Dispute sent to admin", invalidate: [queryKeys.order(id), queryKeys.orderDisputes(id), queryKeys.contactSubmissions, queryKeys.adminStats] });
   const confirmCompletion = useApiMutation(() => orderService.confirmCompletion(id), { successMessage: "Completion confirmed", invalidate: [queryKeys.order(id), queryKeys.orders, queryKeys.myRequirements, queryKeys.payments] });
   const createPayment = useApiMutation(paymentService.create, { successMessage: "Payment started" });
   const verifyPayment = useApiMutation(({ paymentId, payload }) => paymentService.verify(paymentId, payload), { successMessage: "Payment successful", invalidate: [queryKeys.order(id), queryKeys.payments] });
   const review = useApiMutation((payload) => reviewService.create({ ...payload, order_id: id, creator_id: order.data?.creator_id }), { successMessage: "Review submitted" });
   const messageForm = useForm({ resolver: zodResolver(messageSchema), defaultValues: { message: "", attachment_url: "", attachment_name: "" } });
   const reviewForm = useForm({ resolver: zodResolver(reviewSchema), defaultValues: { rating: 5 } });
+  const disputeForm = useForm({ resolver: zodResolver(disputeSchema), defaultValues: { reason: "QUALITY_ISSUE", details: "", evidence_url: "", evidence_name: "" } });
   const attachmentUrl = messageForm.watch("attachment_url");
   const attachmentName = messageForm.watch("attachment_name");
+  const disputeEvidenceUrl = disputeForm.watch("evidence_url");
+  const disputeEvidenceName = disputeForm.watch("evidence_name");
 
   const handleAttachmentFile = async (event) => {
     const file = event.target.files?.[0];
@@ -172,6 +267,27 @@ export function OrderWorkspacePage() {
       messageForm.setError("attachment_url", { message: "Attachment upload failed" });
     } finally {
       setIsUploadingAttachment(false);
+      event.target.value = "";
+    }
+  };
+
+  const handleDisputeEvidenceFile = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5_000_000) {
+      disputeForm.setError("evidence_url", { message: "Evidence must be under 5 MB" });
+      event.target.value = "";
+      return;
+    }
+    setIsUploadingEvidence(true);
+    try {
+      const uploadedUrl = await uploadService.uploadFile(file, "dispute-evidence");
+      disputeForm.setValue("evidence_url", uploadedUrl || "", { shouldDirty: true, shouldValidate: true });
+      disputeForm.setValue("evidence_name", file.name, { shouldDirty: true, shouldValidate: true });
+    } catch {
+      disputeForm.setError("evidence_url", { message: "Evidence upload failed" });
+    } finally {
+      setIsUploadingEvidence(false);
       event.target.value = "";
     }
   };
@@ -265,6 +381,21 @@ export function OrderWorkspacePage() {
     sendMessage.mutate(payload, { onSuccess: () => messageForm.reset({ message: "", attachment_url: "", attachment_name: "" }) });
   };
 
+  const submitDispute = (values) => {
+    if (!window.confirm("This will pause completion and payout until an admin reviews the dispute. Continue?")) return;
+    createDispute.mutate({
+      reason: values.reason,
+      details: values.details.trim(),
+      evidence_url: values.evidence_url?.trim() || null,
+      evidence_name: values.evidence_name?.trim() || null,
+    }, {
+      onSuccess: () => {
+        disputeForm.reset({ reason: "QUALITY_ISSUE", details: "", evidence_url: "", evidence_name: "" });
+        setIsDisputeOpen(false);
+      },
+    });
+  };
+
   const currentOrder = order.data ?? {};
   const creatorName = personName(currentOrder.creator, "Creator");
   const upfrontAmount = Number(currentOrder.total_amount ?? 0);
@@ -272,7 +403,10 @@ export function OrderWorkspacePage() {
   const isCompleted = currentOrder.status === "COMPLETED";
   const isCustomer = user?.id === currentOrder.customer_id;
   const isCreator = user?.id === currentOrder.creator_id;
+  const isAdmin = user?.role === "ADMIN";
   const hasConfirmedCompletion = isCustomer ? Boolean(currentOrder.customer_completed_at) : isCreator ? Boolean(currentOrder.creator_completed_at) : false;
+  const canRaiseDispute = !hasConfirmedCompletion && (isCustomer || isCreator) && ["ACTIVE", "DELIVERED"].includes(currentOrder.status);
+  const disputeItems = asArray(disputes.data);
 
   const startRazorpayPayment = async ({ amount, paymentMethod, description }) => {
     const loaded = await loadRazorpayCheckout();
@@ -351,9 +485,8 @@ export function OrderWorkspacePage() {
                 <div className="mt-6 grid gap-2 sm:grid-cols-3">
                   {!isPendingActivation ? <RoleGuard roles={["CREATOR"]}>
                     {!hasConfirmedCompletion && currentOrder.status === "ACTIVE" ? <Button size="sm" variant="outline" onClick={() => updateStatus.mutate("DELIVERED")}>Mark delivered</Button> : null}
-                    {!hasConfirmedCompletion && currentOrder.status === "DISPUTED" ? <Button size="sm" variant="outline" onClick={() => updateStatus.mutate("ACTIVE")}>Resume work</Button> : null}
-                    {!hasConfirmedCompletion && ["ACTIVE", "DELIVERED"].includes(currentOrder.status) ? <Button size="sm" variant="outline" onClick={() => updateStatus.mutate("DISPUTED")}>Raise dispute</Button> : null}
                   </RoleGuard> : null}
+                  {!isPendingActivation && canRaiseDispute ? <Button size="sm" variant="outline" onClick={() => setIsDisputeOpen(true)}><AlertTriangle className="h-4 w-4" />Raise dispute</Button> : null}
                   {!isPendingActivation && isDelivered && (isCustomer || isCreator) && !hasConfirmedCompletion ? (
                     <Button size="sm" variant="accent" disabled={confirmCompletion.isPending} onClick={() => confirmCompletion.mutate()}>
                       Confirm completion
@@ -384,6 +517,67 @@ export function OrderWorkspacePage() {
               </CardContent>
             </Card>
           )}
+
+          {isDisputeOpen ? (
+            <div className="fixed inset-0 z-50 grid place-items-center bg-primary/40 px-4 py-6">
+              <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-6 shadow-xl">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 className="text-xl font-bold text-primary">Raise dispute</h2>
+                    <p className="mt-1 text-sm text-muted-foreground">Admin will be notified and completion or payout will stay paused while this is reviewed.</p>
+                  </div>
+                  <Button type="button" size="sm" variant="outline" onClick={() => setIsDisputeOpen(false)}>Close</Button>
+                </div>
+                <form className="mt-5 grid gap-3" onSubmit={disputeForm.handleSubmit(submitDispute, showFormValidationToast)}>
+                  <select className="h-11 rounded-lg border border-border bg-white px-3 text-sm font-semibold text-primary" {...disputeForm.register("reason")}>
+                    {DISPUTE_REASONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                  </select>
+                  <Textarea placeholder="Describe what happened and what you want admin to review" {...disputeForm.register("details")} />
+                  <div className="flex flex-wrap items-center gap-3">
+                    <label className={`inline-flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-semibold text-primary shadow-sm transition-colors hover:bg-blue-50 ${isUploadingEvidence ? "cursor-not-allowed opacity-60" : ""}`}>
+                      <Paperclip className="h-4 w-4" />Attach evidence
+                      <input type="file" className="hidden" onChange={handleDisputeEvidenceFile} disabled={isUploadingEvidence} />
+                    </label>
+                    {isUploadingEvidence ? <span className="text-sm font-semibold text-muted-foreground">Uploading evidence...</span> : disputeEvidenceUrl ? <span className="text-sm font-semibold text-muted-foreground">{disputeEvidenceName || "Evidence attached"}</span> : null}
+                  </div>
+                  <div className="rounded-lg border border-border bg-muted/60 p-3 text-sm text-muted-foreground">
+                    Raising a dispute pauses normal completion and payout handling until an admin reviews it. Keep all follow-up communication in the workspace chat.
+                  </div>
+                  <Button disabled={createDispute.isPending || isUploadingEvidence}>Send dispute to admin</Button>
+                </form>
+              </div>
+            </div>
+          ) : null}
+
+          {!isPendingActivation && disputeItems.length ? (
+            <Card>
+              <CardContent>
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-primary" />
+                  <h2 className="text-xl font-bold text-primary">Dispute history</h2>
+                </div>
+                <div className="mt-4 grid gap-4">
+                  {disputeItems.map((dispute) => (
+                    isAdmin ? <DisputeResolutionCard key={dispute.id} dispute={dispute} orderId={id} /> : (
+                      <div key={dispute.id} className="rounded-lg border border-border bg-white p-4">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <p className="font-bold text-primary">{DISPUTE_REASONS.find(([value]) => value === dispute.reason)?.[1] || dispute.reason}</p>
+                            <p className="mt-1 text-sm text-muted-foreground">Raised by {dispute.raised_by_name || "User"} on {dateLabel(dispute.created_at)}</p>
+                          </div>
+                          <Badge variant="primary">{dispute.status}</Badge>
+                        </div>
+                        <p className="mt-3 whitespace-pre-wrap text-sm text-muted-foreground">{dispute.details}</p>
+                        {dispute.evidence_url ? <a href={dispute.evidence_url} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline"><Paperclip className="h-4 w-4" />{dispute.evidence_name || "View evidence"}</a> : null}
+                        {dispute.admin_note ? <p className="mt-3 rounded-lg bg-muted p-3 text-sm text-muted-foreground"><span className="font-semibold text-primary">Admin note:</span> {dispute.admin_note}</p> : null}
+                        {dispute.resolution ? <p className="mt-3 text-sm font-semibold text-primary">Resolution: {DISPUTE_RESOLUTIONS.find(([value]) => value === dispute.resolution)?.[1] || dispute.resolution}</p> : null}
+                      </div>
+                    )
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ) : null}
 
           {!isPendingActivation ? <Card>
             <CardContent>

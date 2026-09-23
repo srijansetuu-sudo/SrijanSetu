@@ -141,9 +141,9 @@ async def update_status(db: AsyncSession, user: User, order_id: UUID, payload: O
         raise ForbiddenError("Only the assigned creator can update order status")
     allowed_transitions = {
         OrderStatus.PENDING: {OrderStatus.ACTIVE, OrderStatus.CANCELLED},
-        OrderStatus.ACTIVE: {OrderStatus.DELIVERED, OrderStatus.CANCELLED, OrderStatus.DISPUTED},
-        OrderStatus.DELIVERED: {OrderStatus.DISPUTED},
-        OrderStatus.DISPUTED: {OrderStatus.ACTIVE, OrderStatus.CANCELLED},
+        OrderStatus.ACTIVE: {OrderStatus.DELIVERED, OrderStatus.CANCELLED},
+        OrderStatus.DELIVERED: set(),
+        OrderStatus.DISPUTED: set(),
         OrderStatus.COMPLETED: set(),
         OrderStatus.CANCELLED: set(),
     }
