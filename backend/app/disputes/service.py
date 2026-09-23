@@ -264,7 +264,7 @@ async def update_dispute(db: AsyncSession, admin: User, dispute_id: UUID, payloa
         dispute.resolved_by = admin.id
         dispute.resolved_at = dispute.resolved_at or datetime.now(UTC)
 
-        if dispute.resolution in {DisputeResolution.RESUME_ORDER, DisputeResolution.HOLD_PAYOUT, DisputeResolution.RELEASE_PAYOUT, DisputeResolution.OTHER, DisputeResolution.REFUND_REVIEW}:
+        if dispute.resolution in {DisputeResolution.RESUME_ORDER, DisputeResolution.OTHER}:
             dispute.order.status = OrderStatus.ACTIVE
             if dispute.order.requirement:
                 dispute.order.requirement.status = RequirementStatus.IN_PROGRESS
@@ -298,4 +298,3 @@ async def update_dispute(db: AsyncSession, admin: User, dispute_id: UUID, payloa
 
     await db.commit()
     return await get_dispute(db, admin, dispute.id)
-

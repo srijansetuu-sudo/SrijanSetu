@@ -30,9 +30,6 @@ def upgrade() -> None:
     resolution_enum = postgresql.ENUM(
         "RESUME_ORDER",
         "CANCEL_ORDER",
-        "HOLD_PAYOUT",
-        "RELEASE_PAYOUT",
-        "REFUND_REVIEW",
         "OTHER",
         name="disputeresolution",
     )

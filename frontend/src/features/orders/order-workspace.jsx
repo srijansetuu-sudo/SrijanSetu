@@ -56,9 +56,6 @@ const DISPUTE_REASONS = [
 const DISPUTE_RESOLUTIONS = [
   ["RESUME_ORDER", "Resume order"],
   ["CANCEL_ORDER", "Cancel order"],
-  ["HOLD_PAYOUT", "Hold payout"],
-  ["RELEASE_PAYOUT", "Release payout"],
-  ["REFUND_REVIEW", "Refund review"],
   ["OTHER", "Other"],
 ];
 const RAZORPAY_CHECKOUT_SRC = "https://checkout.razorpay.com/v1/checkout.js";

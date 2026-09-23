@@ -28,9 +28,6 @@ class DisputeStatus(str, Enum):
 class DisputeResolution(str, Enum):
     RESUME_ORDER = "RESUME_ORDER"
     CANCEL_ORDER = "CANCEL_ORDER"
-    HOLD_PAYOUT = "HOLD_PAYOUT"
-    RELEASE_PAYOUT = "RELEASE_PAYOUT"
-    REFUND_REVIEW = "REFUND_REVIEW"
     OTHER = "OTHER"
 
 
