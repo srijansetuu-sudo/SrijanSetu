@@ -1,15 +1,22 @@
 from datetime import datetime
 
-from sqlalchemy import distinct, func, select
+from sqlalchemy import delete, distinct, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.exceptions import APIError, NotFoundError
 from app.contact.models import ContactSubmission, ContactStatus
-from app.orders.models import Order, OrderStatus
+from app.creators.models import CreatorCategory, CreatorPortfolioPhoto, CreatorProfile, SavedCreator
+from app.ai.models import AiGeneration
+from app.disputes.models import Dispute
+from app.messages.models import Message
+from app.notifications.models import Notification
+from app.orders.models import Order, OrderFile, OrderStatus
 from app.payments.models import Payment, PaymentStatus
+from app.payouts.models import Payout, PayoutAuditLog
 from app.quotations.models import Quotation, QuotationStatus
-from app.requirements.models import Requirement, RequirementStatus
+from app.requirements.models import Requirement, RequirementReference, RequirementStatus
+from app.reviews.models import Review
 from app.users.models import RefreshToken, User, UserRole
 
 
@@ -127,7 +134,14 @@ async def get_stats(db: AsyncSession) -> dict:
 
 
 async def list_users(db: AsyncSession) -> list[User]:
-    result = await db.scalars(select(User).order_by(User.created_at.desc()))
+    result = await db.scalars(
+        select(User)
+        .options(
+            selectinload(User.creator_profile).selectinload(CreatorProfile.categories),
+            selectinload(User.creator_profile).selectinload(CreatorProfile.portfolio_photos),
+        )
+        .order_by(User.created_at.desc())
+    )
     return list(result)
 
 
@@ -137,6 +151,50 @@ async def delete_user(db: AsyncSession, user_id: str, admin_id: str) -> None:
         raise NotFoundError("User not found")
     if str(user.id) == str(admin_id):
         raise APIError("Admin accounts cannot delete themselves")
+
+    # Account removal is intentionally a hard delete.  The database schema has
+    # historical foreign keys without cascading rules, so remove dependent
+    # marketplace data in child-to-parent order in one transaction.
+    order_ids = list(
+        await db.scalars(
+            select(Order.id).where(or_(Order.customer_id == user.id, Order.creator_id == user.id))
+        )
+    )
+    requirement_ids = select(Requirement.id).where(Requirement.customer_id == user.id)
+    quotation_filter = or_(Quotation.creator_id == user.id, Quotation.requirement_id.in_(requirement_ids))
+
+    if order_ids:
+        await db.execute(delete(PayoutAuditLog).where(PayoutAuditLog.order_id.in_(order_ids)))
+        await db.execute(delete(Payout).where(Payout.order_id.in_(order_ids)))
+        await db.execute(delete(ContactSubmission).where(ContactSubmission.order_id.in_(order_ids)))
+        await db.execute(delete(Dispute).where(Dispute.order_id.in_(order_ids)))
+        await db.execute(delete(Review).where(Review.order_id.in_(order_ids)))
+        await db.execute(delete(Message).where(Message.order_id.in_(order_ids)))
+        await db.execute(delete(OrderFile).where(OrderFile.order_id.in_(order_ids)))
+        await db.execute(delete(Payment).where(Payment.order_id.in_(order_ids)))
+        await db.execute(delete(Order).where(Order.id.in_(order_ids)))
+
+    # These records can also exist without an order (for example a saved
+    # creator, a draft quotation, or a notification).
+    await db.execute(delete(PayoutAuditLog).where(PayoutAuditLog.performed_by == user.id))
+    await db.execute(update(Payout).where(Payout.created_by == user.id).values(created_by=None))
+    await db.execute(update(Payout).where(Payout.updated_by == user.id).values(updated_by=None))
+    await db.execute(update(Dispute).where(Dispute.raised_by == user.id).values(raised_by=None))
+    await db.execute(update(Dispute).where(Dispute.resolved_by == user.id).values(resolved_by=None))
+    await db.execute(delete(ContactSubmission).where(ContactSubmission.user_id == user.id))
+    await db.execute(delete(Review).where(or_(Review.reviewer_id == user.id, Review.creator_id == user.id)))
+    await db.execute(delete(SavedCreator).where(or_(SavedCreator.customer_id == user.id, SavedCreator.creator_id == user.id)))
+    await db.execute(delete(Quotation).where(quotation_filter))
+    await db.execute(delete(RequirementReference).where(RequirementReference.requirement_id.in_(requirement_ids)))
+    await db.execute(delete(Requirement).where(Requirement.customer_id == user.id))
+
+    profile_ids = select(CreatorProfile.id).where(CreatorProfile.user_id == user.id)
+    await db.execute(delete(CreatorCategory).where(CreatorCategory.creator_id.in_(profile_ids)))
+    await db.execute(delete(CreatorPortfolioPhoto).where(CreatorPortfolioPhoto.creator_id.in_(profile_ids)))
+    await db.execute(delete(CreatorProfile).where(CreatorProfile.user_id == user.id))
+    await db.execute(delete(AiGeneration).where(AiGeneration.user_id == user.id))
+    await db.execute(delete(Notification).where(Notification.user_id == user.id))
+    await db.execute(delete(RefreshToken).where(RefreshToken.user_id == user.id))
     await db.delete(user)
     await db.commit()
 

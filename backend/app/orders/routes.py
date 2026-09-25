@@ -20,6 +20,7 @@ def _participant_payload(user: User | None) -> dict | None:
     return {
         "id": str(user.id),
         "full_name": user.full_name,
+        "email": user.email,
         "avatar_url": user.avatar_url,
         "phone_number": user.phone_number,
         "address_line": user.address_line,

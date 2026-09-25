@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Activity, BarChart3, CheckCircle2, Clock, FileText, Headphones, IndianRupee, MessageSquare, Trash2, TrendingUp, Users } from "lucide-react";
+import { Activity, BarChart3, CheckCircle2, Clock, FileText, Headphones, IndianRupee, MessageSquare, Trash2, TrendingUp, UserCircle, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
@@ -133,16 +133,25 @@ export function AdminUsersPage() {
               metadata={[
                 { label: "Role", value: user.role },
                 { label: "Active", value: user.is_active ? "Yes" : "No" },
+                { label: "Phone", value: user.phone_number || "Not provided" },
+                { label: "Location", value: [user.address_line, user.city, user.state, user.postal_code].filter(Boolean).join(", ") || "Not provided" },
+                ...(user.creator_profile ? [
+                  { label: "Creator profile", value: <Link className="font-semibold text-primary hover:underline" href={`/creators/${user.creator_profile.id}`}>{user.creator_profile.brand_name || "View public profile"}</Link> },
+                  { label: "Creator details", value: `${user.creator_profile.headline || "No headline"} · ${user.creator_profile.years_of_experience ?? 0} years` },
+                ] : []),
                 { label: "Created", value: dateLabel(user.created_at) },
               ]}
               actions={(
-                <Button variant="destructive" size="sm" onClick={() => {
-                  if (window.confirm(`Delete ${user.full_name ?? user.email}?`)) {
-                    remove.mutate(user.id);
-                  }
-                }}>
-                  <Trash2 className="mr-2 h-4 w-4" />Remove
-                </Button>
+                <div className="flex items-center gap-2">
+                  {user.avatar_url ? <img src={user.avatar_url} alt="" className="h-9 w-9 rounded-full object-cover" /> : <UserCircle className="h-8 w-8 text-muted-foreground" />}
+                  <Button variant="destructive" size="sm" onClick={() => {
+                    if (window.confirm(`Permanently delete ${user.full_name ?? user.email} and all related marketplace data?`)) {
+                      remove.mutate(user.id);
+                    }
+                  }}>
+                    <Trash2 className="mr-2 h-4 w-4" />Remove
+                  </Button>
+                </div>
               )}
             />
           )) : <EmptyState title="No users found" description="There are no user accounts to manage right now." />}

@@ -42,7 +42,7 @@ async def list_profiles(db: AsyncSession, limit: int, offset: int, search: str |
     statement = (
         select(CreatorProfile)
         .join(CreatorProfile.user)
-        .options(selectinload(CreatorProfile.categories), selectinload(CreatorProfile.portfolio_photos))
+        .options(selectinload(CreatorProfile.user), selectinload(CreatorProfile.categories), selectinload(CreatorProfile.portfolio_photos))
         .order_by(CreatorProfile.created_at.desc())
         .offset(offset)
         .limit(limit)
@@ -71,7 +71,7 @@ async def list_profiles(db: AsyncSession, limit: int, offset: int, search: str |
 async def get_profile(db: AsyncSession, creator_id: UUID) -> CreatorProfile:
     profile = await db.scalar(
         select(CreatorProfile)
-        .options(selectinload(CreatorProfile.categories), selectinload(CreatorProfile.portfolio_photos))
+        .options(selectinload(CreatorProfile.user), selectinload(CreatorProfile.categories), selectinload(CreatorProfile.portfolio_photos))
         .where(CreatorProfile.id == creator_id)
     )
     if not profile:
@@ -82,7 +82,7 @@ async def get_profile(db: AsyncSession, creator_id: UUID) -> CreatorProfile:
 async def get_profile_by_user(db: AsyncSession, user: User) -> CreatorProfile:
     profile = await db.scalar(
         select(CreatorProfile)
-        .options(selectinload(CreatorProfile.categories), selectinload(CreatorProfile.portfolio_photos))
+        .options(selectinload(CreatorProfile.user), selectinload(CreatorProfile.categories), selectinload(CreatorProfile.portfolio_photos))
         .where(CreatorProfile.user_id == user.id)
     )
     if not profile:

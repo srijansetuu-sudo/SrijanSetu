@@ -115,6 +115,7 @@ function PersonSummary({ label, person, linkProfile = false }) {
       <span className="min-w-0">
         <span className="block text-xs font-semibold uppercase text-muted-foreground">{label}</span>
         <span className="block truncate font-bold text-primary">{personName(person, label)}</span>
+        {person?.email ? <span className="mt-1 block text-sm text-muted-foreground">{person.email}</span> : null}
         {person?.phone_number ? <span className="mt-1 block text-sm text-muted-foreground">{person.phone_number}</span> : null}
         {address ? <span className="mt-1 block text-sm text-muted-foreground">{address}</span> : null}
       </span>

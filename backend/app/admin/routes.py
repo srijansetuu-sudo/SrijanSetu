@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.admin import service
 from app.auth.dependencies import require_admin
 from app.auth.schemas import APIResponse
+from app.creators.schemas import CreatorProfileRead
 from app.database.session import get_db
 from app.quotations.schemas import QuotationRead
 from app.requirements.schemas import RequirementRead
@@ -24,7 +25,12 @@ async def admin_stats(db: AsyncSession = Depends(get_db), user: User = Depends(r
 @router.get("/users", response_model=APIResponse)
 async def list_users(db: AsyncSession = Depends(get_db), user: User = Depends(require_admin)):
     users = await service.list_users(db)
-    items = [UserResponse.model_validate(item).model_dump(mode="json") for item in users]
+    items = []
+    for item in users:
+        payload = UserResponse.model_validate(item).model_dump(mode="json")
+        profile = item.creator_profile
+        payload["creator_profile"] = CreatorProfileRead.model_validate(profile).model_dump(mode="json") if profile else None
+        items.append(payload)
     return APIResponse(data={"items": items})
 
 

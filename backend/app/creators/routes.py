@@ -13,16 +13,32 @@ from app.users.models import User
 router = APIRouter(prefix="/creators", tags=["creators"])
 
 
+def _profile_payload(profile):
+    payload = CreatorProfileRead.model_validate(profile).model_dump(mode="json")
+    user = profile.user
+    payload["contact"] = {
+        "full_name": user.full_name,
+        "email": user.email,
+        "avatar_url": user.avatar_url,
+        "phone_number": user.phone_number,
+        "address_line": user.address_line,
+        "city": user.city,
+        "state": user.state,
+        "postal_code": user.postal_code,
+    }
+    return payload
+
+
 @router.put("/profile", response_model=APIResponse)
 async def upsert_profile(payload: CreatorProfileUpsert, db: AsyncSession = Depends(get_db), user: User = Depends(require_creator)):
     profile = await service.upsert_profile(db, user, payload)
-    return APIResponse(message="Creator profile saved", data={"creator": CreatorProfileRead.model_validate(profile).model_dump(mode="json")})
+    return APIResponse(message="Creator profile saved", data={"creator": _profile_payload(profile)})
 
 
 @router.get("/profile/me", response_model=APIResponse)
 async def my_profile(db: AsyncSession = Depends(get_db), user: User = Depends(require_creator)):
     profile = await service.get_profile_by_user(db, user)
-    return APIResponse(data={"creator": CreatorProfileRead.model_validate(profile).model_dump(mode="json")})
+    return APIResponse(data={"creator": _profile_payload(profile)})
 
 
 @router.get("", response_model=APIResponse)
@@ -35,7 +51,7 @@ async def list_profiles(
     user: User = Depends(get_current_active_user),
 ):
     profiles = await service.list_profiles(db, limit, offset, search=search, category=category)
-    items = [CreatorProfileRead.model_validate(profile).model_dump(mode="json") for profile in profiles]
+    items = [_profile_payload(profile) for profile in profiles]
     return APIResponse(data={"items": items, "limit": limit, "offset": offset})
 
 
@@ -57,7 +73,7 @@ async def list_saved_creators(db: AsyncSession = Depends(get_db), user: User = D
 @router.get("/{creator_id}", response_model=APIResponse)
 async def get_profile(creator_id: UUID, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_active_user)):
     profile = await service.get_profile(db, creator_id)
-    return APIResponse(data={"creator": CreatorProfileRead.model_validate(profile).model_dump(mode="json")})
+    return APIResponse(data={"creator": _profile_payload(profile)})
 
 
 @router.post("/{creator_id}/save", response_model=APIResponse)

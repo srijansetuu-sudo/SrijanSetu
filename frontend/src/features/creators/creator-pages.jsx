@@ -77,6 +77,8 @@ export function CreatorDetailsPage() {
   const categories = profile.categories ?? profile.creator_categories ?? [];
   const portfolioPhotos = asArray(profile.portfolio_photos).map((photo) => photo.image_url).filter(Boolean);
   const galleryPhotos = portfolioPhotos.length ? portfolioPhotos : [profile.portfolio_cover_url].filter(Boolean);
+  const contact = profile.contact ?? {};
+  const location = [contact.address_line, contact.city, contact.state, contact.postal_code].filter(Boolean).join(", ");
   const isTogglingSaved = save.isPending || removeSaved.isPending || savedCreators.isLoading;
 
   return (
@@ -90,6 +92,7 @@ export function CreatorDetailsPage() {
               <p className="mt-3 text-lg text-muted-foreground">{profile.headline}</p>
               <div className="mt-5 flex flex-wrap gap-2">{categories.map((cat, i) => <Badge key={cat.id ?? i}>{cat.category_name ?? cat}</Badge>)}</div>
               <Card className="mt-6"><CardContent><h2 className="font-bold text-primary">About</h2><p className="mt-3 text-muted-foreground">{profile.description ?? "This creator has not added a description yet."}</p></CardContent></Card>
+              <Card className="mt-6"><CardContent><h2 className="font-bold text-primary">Contact & location</h2><div className="mt-3 grid gap-1 text-sm text-muted-foreground"><p>{contact.full_name || "Creator"}</p>{contact.phone_number ? <p>{contact.phone_number}</p> : null}{contact.email ? <p>{contact.email}</p> : null}{location ? <p>{location}</p> : null}{!contact.phone_number && !contact.email && !location ? <p>Contact details have not been added yet.</p> : null}</div></CardContent></Card>
               <Card className="mt-6"><CardContent><h2 className="font-bold text-primary">Artwork</h2>{galleryPhotos.length ? <div className="mt-4 grid gap-3 sm:grid-cols-2">{galleryPhotos.map((photoUrl, index) => <img key={`${photoUrl}-${index}`} src={photoUrl} alt={`Artwork ${index + 1}`} className="h-64 w-full rounded-lg object-cover" />)}</div> : <EmptyState title="No artwork photos uploaded" />}</CardContent></Card>
             </section>
             <aside className="grid gap-4">
