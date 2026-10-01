@@ -5,7 +5,7 @@ export const metadata = {
   title: "SrijanSetu",
   description: "From Thought To Creation",
   icons: {
-    icon: "/srijansetu_favicon.png",
+    icon: "/srijansetu_favicon_circular.png",
   },
 };
 
